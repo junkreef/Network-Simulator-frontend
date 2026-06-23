@@ -13,7 +13,7 @@ import type {
   NodeChange, 
   EdgeChange 
 } from 'reactflow';
-import { RouterNodeData, HostNodeData, NetworkEdgeData } from '../types/topology';
+import type { RouterNodeData, HostNodeData, NetworkEdgeData } from '../types/topology';
 
 interface TopologyState {
   nodes: Node[];
@@ -59,7 +59,7 @@ const initialHostData = (label: string): HostNodeData => ({
   vlanInterfaces: [],
 });
 
-export const useTopologyStore = create<TopologyState>((set, get) => ({
+export const useTopologyStore = create<TopologyState>((set) => ({
   nodes: [
     {
       id: 'router-1',

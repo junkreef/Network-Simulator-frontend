@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTopologyStore } from '../../store/topologyStore';
-import { RouterNodeData, HostNodeData, NetworkEdgeData, VlanInterfaceData } from '../../types/topology';
+import type { NetworkEdgeData, VlanInterfaceData } from '../../types/topology';
 import { getNodeStatus } from '../../api/client';
 import { Trash2, Plus, X, RefreshCw } from 'lucide-react';
 import './PropertyPanel.css';
@@ -126,6 +126,9 @@ export default function PropertyPanel() {
       </div>
     );
   }
+
+  // ここで selectedNode の存在を確定させる
+  if (!selectedNode) return null;
 
   // ノード設定表示
   const isRouter = selectedNode.type === 'router';

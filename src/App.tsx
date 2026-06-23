@@ -1,4 +1,4 @@
-import React from 'react';
+
 import Header from './components/layout/Header';
 import Canvas from './features/topology/Canvas';
 import PropertyPanel from './components/property/PropertyPanel';

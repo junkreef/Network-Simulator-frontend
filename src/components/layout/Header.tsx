@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTopologyStore } from '../../store/topologyStore';
 import { applyTopology } from '../../api/client';
 import { Play, Check, AlertTriangle, RefreshCw } from 'lucide-react';
