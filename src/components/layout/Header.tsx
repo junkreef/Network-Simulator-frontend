@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useTopologyStore } from '../../store/topologyStore';
 import { applyTopology } from '../../api/client';
-import { Play, Check, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Play, Check, AlertTriangle, RefreshCw, FileJson } from 'lucide-react';
+import JsonEditorModal from '../json/JsonEditorModal';
 import './Header.css';
 
 export default function Header() {
   const { nodes, edges } = useTopologyStore();
   const [isApplying, setIsApplying] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -181,6 +183,16 @@ export default function Header() {
       <div className="header-actions">
         <button
           type="button"
+          onClick={() => setIsJsonModalOpen(true)}
+          className="json-button"
+          data-testid="json-edit-btn"
+          title="JSON構成の表示・インポート"
+        >
+          <FileJson size={16} />
+          JSON編集
+        </button>
+        <button
+          type="button"
           onClick={handleApply}
           disabled={isApplying}
           className={`apply-button ${isApplying ? 'applying' : ''}`}
@@ -206,6 +218,8 @@ export default function Header() {
           <span>{toast.message}</span>
         </div>
       )}
+
+      <JsonEditorModal isOpen={isJsonModalOpen} onClose={() => setIsJsonModalOpen(false)} />
     </header>
   );
 }
