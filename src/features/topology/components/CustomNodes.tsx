@@ -1,5 +1,6 @@
 import React from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import { Handle, Position } from 'reactflow';
+import type { NodeProps } from 'reactflow';
 import { Network, Laptop, Activity } from 'lucide-react';
 import { RouterNodeData, HostNodeData } from '../../../types/topology';
 import './CustomNodes.css';

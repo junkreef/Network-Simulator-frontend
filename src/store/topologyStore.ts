@@ -1,15 +1,17 @@
 import { create } from 'zustand';
 import { 
+  applyNodeChanges, 
+  applyEdgeChanges, 
+  addEdge
+} from 'reactflow';
+import type { 
   Node, 
   Edge, 
   OnNodesChange, 
   OnEdgesChange, 
-  applyNodeChanges, 
-  applyEdgeChanges, 
-  addEdge, 
-  Connection,
-  NodeChange,
-  EdgeChange
+  Connection, 
+  NodeChange, 
+  EdgeChange 
 } from 'reactflow';
 import { RouterNodeData, HostNodeData, NetworkEdgeData } from '../types/topology';
 

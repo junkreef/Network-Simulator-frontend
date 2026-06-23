@@ -1,5 +1,6 @@
 import React from 'react';
-import { EdgeProps, getBezierPath, EdgeLabelRenderer } from 'reactflow';
+import { getBezierPath, EdgeLabelRenderer } from 'reactflow';
+import type { EdgeProps } from 'reactflow';
 import { NetworkEdgeData } from '../../../types/topology';
 import './NetworkEdge.css';
 

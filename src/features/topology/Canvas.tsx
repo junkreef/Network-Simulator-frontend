@@ -4,9 +4,8 @@ import ReactFlow, {
   Controls,
   MiniMap,
   BackgroundVariant,
-  NodeTypes,
-  EdgeTypes,
 } from 'reactflow';
+import type { NodeTypes, EdgeTypes } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useTopologyStore } from '../../store/topologyStore';
 import { RouterNode, HostNode } from './components/CustomNodes';
