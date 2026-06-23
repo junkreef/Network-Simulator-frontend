@@ -13,7 +13,7 @@ import type {
   NodeChange, 
   EdgeChange 
 } from 'reactflow';
-import type { RouterNodeData, HostNodeData, NetworkEdgeData } from '../types/topology';
+import type { RouterNodeData, HostNodeData, NetworkEdgeData, SwitchNodeData } from '../types/topology';
 
 interface TopologyState {
   nodes: Node[];
@@ -25,10 +25,10 @@ interface TopologyState {
   onConnect: (connection: Connection) => void;
   selectNode: (id: string | null) => void;
   selectEdge: (id: string | null) => void;
-  addNode: (type: 'router' | 'host') => void;
+  addNode: (type: 'router' | 'host' | 'switch') => void;
   deleteNode: (id: string) => void;
   deleteEdge: (id: string) => void;
-  updateNodeData: (nodeId: string, data: Partial<RouterNodeData> | Partial<HostNodeData> | any) => void;
+  updateNodeData: (nodeId: string, data: Partial<RouterNodeData> | Partial<HostNodeData> | Partial<SwitchNodeData> | any) => void;
   updateEdgeData: (edgeId: string, data: Partial<NetworkEdgeData>) => void;
   setTopology: (nodes: Node[], edges: Edge[]) => void;
   addPort: (nodeId: string) => void;
@@ -60,6 +60,18 @@ const initialHostData = (label: string): HostNodeData => ({
   gateway: '',
   vlanInterfaces: [],
 });
+
+const initialSwitchData = (label: string): SwitchNodeData => ({
+  label,
+  status: 'down',
+  interfaces: [
+    { id: 'eth0', name: 'eth0', vlanMode: 'access', vlanId: 1, vlanIds: [] },
+    { id: 'eth1', name: 'eth1', vlanMode: 'access', vlanId: 1, vlanIds: [] },
+    { id: 'eth2', name: 'eth2', vlanMode: 'access', vlanId: 1, vlanIds: [] },
+    { id: 'eth3', name: 'eth3', vlanMode: 'access', vlanId: 1, vlanIds: [] },
+  ],
+});
+
 
 export const useTopologyStore = create<TopologyState>((set) => ({
   nodes: [
@@ -142,6 +154,17 @@ export const useTopologyStore = create<TopologyState>((set) => ({
                 )
               }
             };
+          } else if (node.type === 'switch') {
+            const data = node.data as SwitchNodeData;
+            return {
+              ...node,
+              data: {
+                ...data,
+                interfaces: data.interfaces.map(i => 
+                  i.name === sourcePort ? { ...i, connectedTo: connection.target || undefined } : i
+                )
+              }
+            };
           } else {
             const data = node.data as HostNodeData;
             return {
@@ -156,6 +179,17 @@ export const useTopologyStore = create<TopologyState>((set) => ({
         if (node.id === connection.target && connection.source) {
           if (node.type === 'router') {
             const data = node.data as RouterNodeData;
+            return {
+              ...node,
+              data: {
+                ...data,
+                interfaces: data.interfaces.map(i => 
+                  i.name === targetPort ? { ...i, connectedTo: connection.source || undefined } : i
+                )
+              }
+            };
+          } else if (node.type === 'switch') {
+            const data = node.data as SwitchNodeData;
             return {
               ...node,
               data: {
@@ -194,15 +228,26 @@ export const useTopologyStore = create<TopologyState>((set) => ({
     set({ selectedEdgeId: id, selectedNodeId: null });
   },
 
-  addNode: (type: 'router' | 'host') => {
+  addNode: (type: 'router' | 'host' | 'switch') => {
     set((state) => {
       const id = `${type}-${Date.now()}`;
-      const label = type === 'router' ? `Router-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'router').length)}` : `Host-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'host').length)}`;
+      const label = type === 'router' 
+        ? `Router-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'router').length)}` 
+        : type === 'host'
+          ? `Host-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'host').length)}`
+          : `Switch-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'switch').length)}`;
+      
+      const initialData = type === 'router' 
+        ? initialRouterData(label) 
+        : type === 'host'
+          ? initialHostData(label)
+          : initialSwitchData(label);
+
       const newNode: Node = {
         id,
         type,
         position: { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
-        data: type === 'router' ? initialRouterData(label) : initialHostData(label),
+        data: initialData,
       };
       return {
         nodes: [...state.nodes, newNode],
@@ -243,6 +288,15 @@ export const useTopologyStore = create<TopologyState>((set) => ({
                   interfaces: data.interfaces.map(i => i.name === edge.sourceHandle ? { ...i, connectedTo: undefined } : i)
                 }
               };
+            } else if (node.type === 'switch') {
+              const data = node.data as SwitchNodeData;
+              return {
+                ...node,
+                data: {
+                  ...data,
+                  interfaces: data.interfaces.map(i => i.name === edge.sourceHandle ? { ...i, connectedTo: undefined } : i)
+                }
+              };
             } else {
               const data = node.data as HostNodeData;
               return { ...node, data: { ...data, connectedTo: undefined } };
@@ -251,6 +305,15 @@ export const useTopologyStore = create<TopologyState>((set) => ({
           if (node.id === edge.target) {
             if (node.type === 'router') {
               const data = node.data as RouterNodeData;
+              return {
+                ...node,
+                data: {
+                  ...data,
+                  interfaces: data.interfaces.map(i => i.name === edge.targetHandle ? { ...i, connectedTo: undefined } : i)
+                }
+              };
+            } else if (node.type === 'switch') {
+              const data = node.data as SwitchNodeData;
               return {
                 ...node,
                 data: {
@@ -316,24 +379,44 @@ export const useTopologyStore = create<TopologyState>((set) => ({
   addPort: (nodeId: string) => {
     set((state) => ({
       nodes: state.nodes.map((node) => {
-        if (node.id === nodeId && node.type === 'router') {
-          const data = node.data as RouterNodeData;
-          const currentMax = data.interfaces.reduce((max, i) => {
-            const num = parseInt(i.name.replace('eth', ''), 10);
-            return isNaN(num) ? max : Math.max(max, num);
-          }, -1);
-          const nextIndex = currentMax + 1;
-          const nextPortName = `eth${nextIndex}`;
-          return {
-            ...node,
-            data: {
-              ...data,
-              interfaces: [
-                ...data.interfaces,
-                { id: nextPortName, name: nextPortName, ipAddress: '', netmask: '' }
-              ]
-            }
-          };
+        if (node.id === nodeId) {
+          if (node.type === 'router') {
+            const data = node.data as RouterNodeData;
+            const currentMax = data.interfaces.reduce((max, i) => {
+              const num = parseInt(i.name.replace('eth', ''), 10);
+              return isNaN(num) ? max : Math.max(max, num);
+            }, -1);
+            const nextIndex = currentMax + 1;
+            const nextPortName = `eth${nextIndex}`;
+            return {
+              ...node,
+              data: {
+                ...data,
+                interfaces: [
+                  ...data.interfaces,
+                  { id: nextPortName, name: nextPortName, ipAddress: '', netmask: '' }
+                ]
+              }
+            };
+          } else if (node.type === 'switch') {
+            const data = node.data as SwitchNodeData;
+            const currentMax = data.interfaces.reduce((max, i) => {
+              const num = parseInt(i.name.replace('eth', ''), 10);
+              return isNaN(num) ? max : Math.max(max, num);
+            }, -1);
+            const nextIndex = currentMax + 1;
+            const nextPortName = `eth${nextIndex}`;
+            return {
+              ...node,
+              data: {
+                ...data,
+                interfaces: [
+                  ...data.interfaces,
+                  { id: nextPortName, name: nextPortName, vlanMode: 'access', vlanId: 1, vlanIds: [] }
+                ]
+              }
+            };
+          }
         }
         return node;
       })
@@ -343,15 +426,26 @@ export const useTopologyStore = create<TopologyState>((set) => ({
   deletePort: (nodeId: string, portName: string) => {
     set((state) => ({
       nodes: state.nodes.map((node) => {
-        if (node.id === nodeId && node.type === 'router') {
-          const data = node.data as RouterNodeData;
-          return {
-            ...node,
-            data: {
-              ...data,
-              interfaces: data.interfaces.filter(i => i.name !== portName)
-            }
-          };
+        if (node.id === nodeId) {
+          if (node.type === 'router') {
+            const data = node.data as RouterNodeData;
+            return {
+              ...node,
+              data: {
+                ...data,
+                interfaces: data.interfaces.filter(i => i.name !== portName)
+              }
+            };
+          } else if (node.type === 'switch') {
+            const data = node.data as SwitchNodeData;
+            return {
+              ...node,
+              data: {
+                ...data,
+                interfaces: data.interfaces.filter(i => i.name !== portName)
+              }
+            };
+          }
         }
         return node;
       }),

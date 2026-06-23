@@ -72,3 +72,19 @@ export interface NetworkEdgeData {
   sourceInterface?: string;
   targetInterface?: string;
 }
+
+export interface SwitchInterfaceData {
+  id: string;
+  name: string;
+  vlanMode: 'none' | 'access' | 'trunk';
+  vlanId?: number; // for access mode (1-4094)
+  vlanIds?: number[]; // for trunk mode (e.g., [10, 20])
+  connectedTo?: string; // connected node ID
+}
+
+export interface SwitchNodeData {
+  label: string;
+  status: 'up' | 'down';
+  interfaces: SwitchInterfaceData[];
+}
+

@@ -85,6 +85,19 @@ export default function Header() {
             next_hop: r.nextHop,
           })),
         };
+      } else if (node.type === 'switch') {
+        const data = node.data;
+        return {
+          id: node.id,
+          type: 'switch',
+          hostname: data.label,
+          interfaces: (data.interfaces || []).map((i: any) => ({
+            name: i.name,
+            vlan_mode: i.vlanMode || 'none',
+            vlan_id: i.vlanMode === 'access' ? Number(i.vlanId) : undefined,
+            vlan_ids: i.vlanMode === 'trunk' ? (Array.isArray(i.vlanIds) ? i.vlanIds : String(i.vlanIds || '').split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n))) : undefined,
+          })),
+        };
       } else {
         const data = node.data;
         return {

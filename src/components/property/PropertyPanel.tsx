@@ -321,12 +321,15 @@ export default function PropertyPanel() {
     updateNodeData(selectedNode.id, { [field]: value });
   };
 
+  const isSwitch = selectedNode.type === 'switch';
+  const nodeType = selectedNode.type || 'router';
+
   return (
     <div className="property-panel" data-testid="property-panel-node">
       <div className="panel-header">
         <div className="title-wrapper">
-          <span className={`node-badge ${isRouter ? 'router' : 'host'}`}>
-            {isRouter ? 'ROUTER' : 'HOST'}
+          <span className={`node-badge ${nodeType}`}>
+            {nodeType.toUpperCase()}
           </span>
           <h3>{nodeData.label || 'Node'}</h3>
         </div>
@@ -378,11 +381,88 @@ export default function PropertyPanel() {
                 </button>
               </div>
             </section>
-
             {/* インターフェース設定 */}
             <section className="config-section">
               <h4>インターフェース設定</h4>
-              {isRouter ? (
+              {isSwitch ? (
+                // スイッチの物理ポート
+                <div className="interfaces-list">
+                  {(nodeData.interfaces || []).map((iface: any, idx: number) => (
+                    <div className="interface-row-switch" key={iface.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="interface-name" style={{ fontWeight: 'bold' }}>{iface.name}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => deletePort(selectedNode.id, iface.name)}
+                          className="delete-port-btn" 
+                          title="ポート削除"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <label style={{ fontSize: '12px' }}>モード:</label>
+                        <select
+                          value={iface.vlanMode || 'access'}
+                          onChange={(e) => {
+                            const updated = [...(nodeData.interfaces || [])];
+                            updated[idx] = { ...updated[idx], vlanMode: e.target.value };
+                            updateNodeData(selectedNode.id, { interfaces: updated });
+                          }}
+                          style={{ padding: '4px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '4px' }}
+                        >
+                          <option value="access">Access</option>
+                          <option value="trunk">Trunk</option>
+                        </select>
+
+                        {iface.vlanMode === 'trunk' ? (
+                          <>
+                            <label style={{ fontSize: '12px' }}>VLANs:</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 10,20"
+                              value={Array.isArray(iface.vlanIds) ? iface.vlanIds.join(',') : iface.vlanIds || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const ids = val.split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n));
+                                const updated = [...(nodeData.interfaces || [])];
+                                updated[idx] = { ...updated[idx], vlanIds: ids };
+                                updateNodeData(selectedNode.id, { interfaces: updated });
+                              }}
+                              style={{ flex: 1, padding: '4px' }}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <label style={{ fontSize: '12px' }}>VLAN ID:</label>
+                            <input
+                              type="number"
+                              placeholder="1"
+                              min="1"
+                              max="4094"
+                              value={iface.vlanId !== undefined ? iface.vlanId : ''}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                const updated = [...(nodeData.interfaces || [])];
+                                updated[idx] = { ...updated[idx], vlanId: isNaN(val) ? undefined : val };
+                                updateNodeData(selectedNode.id, { interfaces: updated });
+                              }}
+                              style={{ flex: 1, padding: '4px' }}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button 
+                    type="button" 
+                    onClick={() => addPort(selectedNode.id)}
+                    className="add-port-btn"
+                  >
+                    <Plus size={14} /> 物理ポートを追加
+                  </button>
+                </div>
+              ) : isRouter ? (
                 // ルーターの物理ポート
                 <div className="interfaces-list">
                   {(nodeData.interfaces || []).map((iface: any, idx: number) => (
@@ -445,49 +525,51 @@ export default function PropertyPanel() {
               )}
 
               {/* VLAN / サブインターフェース */}
-              <div className="vlan-section">
-                <h5>VLAN サブインターフェース</h5>
-                <div className="vlan-add-form">
-                  <select value={vlanParent} onChange={(e) => setVlanParent(e.target.value)}>
-                    {isRouter ? (
-                      (nodeData.interfaces || []).map((i: any) => (
-                        <option key={i.id} value={i.name}>{i.name}</option>
-                      ))
-                    ) : (
-                      <option value="eth0">eth0</option>
-                    )}
-                  </select>
-                  <input
-                    type="number"
-                    placeholder="VLAN ID (1-4094)"
-                    min="1"
-                    max="4094"
-                    value={vlanIdInput}
-                    onChange={(e) => setVlanIdInput(e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="IP/CIDR (e.g. 10.1.1.1/24)"
-                    value={vlanIpInput}
-                    onChange={(e) => setVlanIpInput(e.target.value)}
-                  />
-                  <button type="button" onClick={handleAddVlan} className="icon-btn-add">
-                    <Plus size={14} />
-                  </button>
-                </div>
+              {!isSwitch && (
+                <div className="vlan-section">
+                  <h5>VLAN サブインターフェース</h5>
+                  <div className="vlan-add-form">
+                    <select value={vlanParent} onChange={(e) => setVlanParent(e.target.value)}>
+                      {isRouter ? (
+                        (nodeData.interfaces || []).map((i: any) => (
+                          <option key={i.id} value={i.name}>{i.name}</option>
+                        ))
+                      ) : (
+                        <option value="eth0">eth0</option>
+                      )}
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="VLAN ID (1-4094)"
+                      min="1"
+                      max="4094"
+                      value={vlanIdInput}
+                      onChange={(e) => setVlanIdInput(e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="IP/CIDR (e.g. 10.1.1.1/24)"
+                      value={vlanIpInput}
+                      onChange={(e) => setVlanIpInput(e.target.value)}
+                    />
+                    <button type="button" onClick={handleAddVlan} className="icon-btn-add">
+                      <Plus size={14} />
+                    </button>
+                  </div>
 
-                <div className="vlan-list">
-                  {(nodeData.vlanInterfaces || []).map((vlan: VlanInterfaceData) => (
-                    <div className="vlan-row" key={vlan.name}>
-                      <span className="vlan-name">{vlan.name}</span>
-                      <span className="vlan-ip">{vlan.ipAddress}</span>
-                      <button type="button" onClick={() => handleRemoveVlan(vlan.name)} className="icon-btn-remove">
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
+                  <div className="vlan-list">
+                    {(nodeData.vlanInterfaces || []).map((vlan: VlanInterfaceData) => (
+                      <div className="vlan-row" key={vlan.name}>
+                        <span className="vlan-name">{vlan.name}</span>
+                        <span className="vlan-ip">{vlan.ipAddress}</span>
+                        <button type="button" onClick={() => handleRemoveVlan(vlan.name)} className="icon-btn-remove">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
 
             {/* ルーティング・スタティック設定（ルーターのみ） */}

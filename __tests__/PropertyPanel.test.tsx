@@ -99,4 +99,46 @@ describe('PropertyPanel Component', () => {
       expect(viewer).toHaveTextContent('Mock Output for Node router-1 [routing_table]');
     });
   });
+
+  it('スイッチのVLANモードやIDを変更した際に状態が正しく更新されること', () => {
+    useTopologyStore.setState({
+      selectedNodeId: 'switch-1',
+      nodes: [
+        {
+          id: 'switch-1',
+          type: 'switch',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Switch-A',
+            status: 'down',
+            interfaces: [
+              { id: 'eth0', name: 'eth0', vlanMode: 'access', vlanId: 1, vlanIds: [] }
+            ]
+          }
+        }
+      ]
+    });
+
+    render(<PropertyPanel />);
+
+    // "SWITCH"というバッジが表示されていることを確認
+    expect(screen.getByText('SWITCH')).toBeInTheDocument();
+
+    // モード選択を取得してTrunkに変更
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    expect(select.value).toBe('access');
+
+    fireEvent.change(select, { target: { value: 'trunk' } });
+
+    // 状態が反映されていることをアサート
+    let updatedNodes = useTopologyStore.getState().nodes;
+    expect(updatedNodes[0].data.interfaces[0].vlanMode).toBe('trunk');
+
+    // 再レンダリングされてVLANs入力ボックスが出現しているか確認
+    const vlanInput = screen.getByPlaceholderText('e.g. 10,20') as HTMLInputElement;
+    fireEvent.change(vlanInput, { target: { value: '10,20' } });
+
+    updatedNodes = useTopologyStore.getState().nodes;
+    expect(updatedNodes[0].data.interfaces[0].vlanIds).toEqual([10, 20]);
+  });
 });
