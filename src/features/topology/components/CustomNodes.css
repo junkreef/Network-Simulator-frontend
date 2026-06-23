@@ -1,0 +1,138 @@
+.custom-node {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  position: relative;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.custom-node:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+  transform: translateY(-2px);
+}
+
+.custom-node.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 12px var(--color-primary-glow), var(--shadow-glow);
+}
+
+.custom-node.up {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.custom-node.up.selected {
+  border-color: var(--color-success);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+}
+
+.node-icon-wrapper {
+  position: relative;
+  background-color: var(--bg-tertiary);
+  padding: 8px;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.node-icon {
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.custom-node.up .node-icon {
+  color: var(--color-success);
+}
+
+.custom-node.selected .node-icon {
+  color: var(--color-primary);
+}
+
+.status-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bg-secondary);
+}
+
+.status-indicator.down {
+  background-color: var(--text-muted);
+}
+
+.status-indicator.up {
+  background-color: var(--color-success);
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+.node-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.node-status-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ハンドルスタイル */
+.node-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background-color: var(--bg-tertiary) !important;
+  border: 2px solid var(--border-color) !important;
+  transition: all 0.2s;
+}
+
+.node-handle:hover {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  transform: scale(1.2);
+}
+
+/* ハンドルラベル（ポート名） */
+.handle-label {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.label-top {
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.label-right {
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.label-bottom {
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.label-left {
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+}

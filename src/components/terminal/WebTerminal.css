@@ -1,0 +1,130 @@
+.web-terminal-container {
+  grid-area: terminal;
+  background-color: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  z-index: 4;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.web-terminal-container.expanded {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: calc(100vw - 400px);
+  height: calc(100vh - 60px);
+  z-index: 10;
+  border-top: none;
+}
+
+@media (max-width: 1024px) {
+  .web-terminal-container.expanded {
+    width: 100vw;
+    height: calc(100vh - 60px);
+  }
+}
+
+.terminal-header {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.terminal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.terminal-header-icon {
+  color: var(--text-secondary);
+}
+
+.connection-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.connection-badge.connected {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.connection-badge.connecting {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.connection-badge.disconnected {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.connection-badge.error {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.terminal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.terminal-body {
+  flex: 1;
+  background-color: #0b0f19;
+  padding: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.xterm-dom-element {
+  width: 100%;
+  height: 100%;
+}
+
+/* Xterm.jsの内部カスタマイズ */
+.xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius-sm);
+}

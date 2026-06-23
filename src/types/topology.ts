@@ -1,0 +1,74 @@
+export interface InterfaceData {
+  id: string;
+  name: string;
+  ipAddress: string;
+  netmask: string;
+  connectedTo?: string; // 接続先ノードID
+}
+
+export interface VlanInterfaceData {
+  name: string;
+  parentInterface: string;
+  vlanId: number;
+  ipAddress: string; // CIDR format (e.g. 10.10.10.1/24)
+}
+
+export interface OspfConfig {
+  enabled: boolean;
+  routerId: string;
+  areaId: string;
+  interfaces: string[]; // Active interface names
+}
+
+export interface RipConfig {
+  enabled: boolean;
+  networks: string[]; // Network CIDRs
+  interfaces: string[]; // Active interface names
+}
+
+export interface BgpNeighbor {
+  ipAddress: string;
+  remoteAs: number;
+}
+
+export interface BgpConfig {
+  enabled: boolean;
+  asNumber: number;
+  routerId: string;
+  neighbors: BgpNeighbor[];
+}
+
+export interface StaticRoute {
+  destination: string; // CIDR format (e.g. 172.16.0.0/16)
+  nextHop: string;
+}
+
+export interface RouterNodeData {
+  label: string;
+  status: 'up' | 'down';
+  interfaces: InterfaceData[];
+  vlanInterfaces: VlanInterfaceData[];
+  routing: {
+    ospf: OspfConfig;
+    rip: RipConfig;
+    bgp: BgpConfig;
+  };
+  staticRoutes: StaticRoute[];
+}
+
+export interface HostNodeData {
+  label: string;
+  status: 'up' | 'down';
+  ipAddress: string; // CIDR format (e.g. 192.168.1.10/24)
+  gateway: string;
+  connectedTo?: string;
+  vlanInterfaces: VlanInterfaceData[];
+}
+
+export interface NetworkEdgeData {
+  bandwidth?: string;
+  delay?: string;
+  cost?: number;
+  sourceInterface?: string;
+  targetInterface?: string;
+}

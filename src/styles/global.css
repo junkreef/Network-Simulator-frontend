@@ -1,0 +1,97 @@
+@import './variables.css';
+@import './reset.css';
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  margin: 0;
+}
+
+.app-container {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "canvas sidebar"
+    "terminal sidebar";
+  grid-template-rows: 60px 1fr 300px;
+  grid-template-columns: 1fr 400px;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .app-container {
+    grid-template-areas:
+      "header"
+      "canvas"
+      "sidebar"
+      "terminal";
+    grid-template-rows: 60px 1fr auto auto;
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+/* スクロールバーのカスタマイズ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: var(--border-radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+/* アニメーション */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--color-success);
+    opacity: 0.8;
+  }
+  50% {
+    box-shadow: 0 0 12px var(--color-success);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* 共通ユーティリティクラス */
+.glow-effect {
+  box-shadow: var(--shadow-glow);
+}
+
+.mono-text {
+  font-family: var(--font-mono);
+}
