@@ -9,11 +9,18 @@ export const RouterNode = ({ data, selected }: NodeProps<RouterNodeData>) => {
 
   return (
     <div className={`custom-node router-node ${selected ? 'selected' : ''} ${isUp ? 'up' : 'down'}`}>
-      {/* 4方向ハンドル */}
-      <Handle type="source" position={Position.Top} id="eth0" className="node-handle" />
-      <Handle type="source" position={Position.Right} id="eth1" className="node-handle" />
-      <Handle type="source" position={Position.Bottom} id="eth2" className="node-handle" />
-      <Handle type="source" position={Position.Left} id="eth3" className="node-handle" />
+      {/* 4方向ハンドル (Source/Targetのペアを配置して双方向接続に対応) */}
+      <Handle type="target" position={Position.Top} id="eth0-tgt" className="node-handle target-handle" style={{ transform: 'translateX(-4px)' }} />
+      <Handle type="source" position={Position.Top} id="eth0-src" className="node-handle source-handle" style={{ transform: 'translateX(4px)' }} />
+      
+      <Handle type="target" position={Position.Right} id="eth1-tgt" className="node-handle target-handle" style={{ transform: 'translateY(-4px)' }} />
+      <Handle type="source" position={Position.Right} id="eth1-src" className="node-handle source-handle" style={{ transform: 'translateY(4px)' }} />
+      
+      <Handle type="target" position={Position.Bottom} id="eth2-tgt" className="node-handle target-handle" style={{ transform: 'translateX(-4px)' }} />
+      <Handle type="source" position={Position.Bottom} id="eth2-src" className="node-handle source-handle" style={{ transform: 'translateX(4px)' }} />
+      
+      <Handle type="target" position={Position.Left} id="eth3-tgt" className="node-handle target-handle" style={{ transform: 'translateY(-4px)' }} />
+      <Handle type="source" position={Position.Left} id="eth3-src" className="node-handle source-handle" style={{ transform: 'translateY(4px)' }} />
 
       <div className="node-icon-wrapper">
         <Network size={24} className="node-icon" />
@@ -38,7 +45,8 @@ export const HostNode = ({ data, selected }: NodeProps<HostNodeData>) => {
 
   return (
     <div className={`custom-node host-node ${selected ? 'selected' : ''} ${isUp ? 'up' : 'down'}`}>
-      <Handle type="source" position={Position.Top} id="eth0" className="node-handle" />
+      <Handle type="target" position={Position.Top} id="eth0-tgt" className="node-handle target-handle" style={{ transform: 'translateX(-4px)' }} />
+      <Handle type="source" position={Position.Top} id="eth0-src" className="node-handle source-handle" style={{ transform: 'translateX(4px)' }} />
 
       <div className="node-icon-wrapper">
         <Laptop size={24} className="node-icon" />

@@ -108,12 +108,14 @@ export default function Header() {
       }
     });
 
+    const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(src|tgt)$/, '') : 'eth0';
+
     const formattedLinks = edges.map(edge => ({
       id: edge.id,
       source_node: edge.source,
-      source_interface: edge.sourceHandle || 'eth0',
+      source_interface: cleanHandle(edge.sourceHandle),
       target_node: edge.target,
-      target_interface: edge.targetHandle || 'eth0',
+      target_interface: cleanHandle(edge.targetHandle),
     }));
 
     const payload = {

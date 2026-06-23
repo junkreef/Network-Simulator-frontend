@@ -107,6 +107,10 @@ export const useTopologyStore = create<TopologyState>((set) => ({
 
   onConnect: (connection: Connection) => {
     set((state) => {
+      const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(src|tgt)$/, '') : 'eth0';
+      const sourcePort = cleanHandle(connection.sourceHandle);
+      const targetPort = cleanHandle(connection.targetHandle);
+
       // 既存のエッジに同じポートが使われていないかチェックし、必要に応じてポートの接続状態を割り当てる
       const newEdgeId = `edge-${Date.now()}`;
       const newEdge: Edge = {
@@ -117,8 +121,8 @@ export const useTopologyStore = create<TopologyState>((set) => ({
         targetHandle: connection.targetHandle,
         type: 'networkEdge',
         data: {
-          sourceInterface: connection.sourceHandle || 'eth0',
-          targetInterface: connection.targetHandle || 'eth0'
+          sourceInterface: sourcePort,
+          targetInterface: targetPort
         }
       };
 
@@ -132,7 +136,7 @@ export const useTopologyStore = create<TopologyState>((set) => ({
               data: {
                 ...data,
                 interfaces: data.interfaces.map(i => 
-                  i.name === connection.sourceHandle ? { ...i, connectedTo: connection.target || undefined } : i
+                  i.name === sourcePort ? { ...i, connectedTo: connection.target || undefined } : i
                 )
               }
             };
@@ -155,7 +159,7 @@ export const useTopologyStore = create<TopologyState>((set) => ({
               data: {
                 ...data,
                 interfaces: data.interfaces.map(i => 
-                  i.name === connection.targetHandle ? { ...i, connectedTo: connection.source || undefined } : i
+                  i.name === targetPort ? { ...i, connectedTo: connection.source || undefined } : i
                 )
               }
             };
