@@ -15,6 +15,8 @@ export default function PropertyPanel() {
     updateEdgeData,
     deleteNode,
     deleteEdge,
+    addPort,
+    deletePort,
   } = useTopologyStore();
 
   const [activeTab, setActiveTab] = useState<'config' | 'status'>('config');
@@ -398,8 +400,23 @@ export default function PropertyPanel() {
                           handleInterfaceChange(idx, 'netmask', mask);
                         }}
                       />
+                      <button 
+                        type="button" 
+                        onClick={() => deletePort(selectedNode.id, iface.name)}
+                        className="delete-port-btn" 
+                        title="ポート削除"
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
                   ))}
+                  <button 
+                    type="button" 
+                    onClick={() => addPort(selectedNode.id)}
+                    className="add-port-btn"
+                  >
+                    <Plus size={14} /> 物理ポートを追加
+                  </button>
                 </div>
               ) : (
                 // ホストのネットワーク設定

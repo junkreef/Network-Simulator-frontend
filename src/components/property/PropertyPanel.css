@@ -262,6 +262,47 @@
   outline: none;
 }
 
+.delete-port-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.delete-port-btn:hover {
+  color: var(--color-danger);
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.add-port-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary);
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  padding: 8px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.add-port-btn:hover {
+  background-color: var(--color-primary);
+  color: white;
+  border-style: solid;
+}
+
 /* VLAN / 追加フォーム */
 .vlan-section {
   margin-top: 16px;

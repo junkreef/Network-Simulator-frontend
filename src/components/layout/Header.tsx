@@ -108,7 +108,7 @@ export default function Header() {
       }
     });
 
-    const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(src|tgt)$/, '') : 'eth0';
+    const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth0';
 
     const formattedLinks = edges.map(edge => ({
       id: edge.id,

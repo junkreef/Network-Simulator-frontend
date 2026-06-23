@@ -2,22 +2,20 @@
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
-  padding: 12px;
-  min-width: 140px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
   color: var(--text-primary);
   font-family: var(--font-sans);
-  position: relative;
   box-shadow: var(--shadow-md);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 200px;
+  overflow: hidden;
 }
 
 .custom-node:hover {
   border-color: var(--color-primary);
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
-  transform: translateY(-2px);
 }
 
 .custom-node.selected {
@@ -34,10 +32,19 @@
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
 }
 
+/* ノードヘッダー */
+.node-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
 .node-icon-wrapper {
   position: relative;
   background-color: var(--bg-tertiary);
-  padding: 8px;
+  padding: 6px;
   border-radius: var(--border-radius-sm);
   display: flex;
   align-items: center;
@@ -81,58 +88,105 @@
 
 .node-label {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .node-status-text {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
 }
 
-/* ハンドルスタイル */
-.node-handle {
-  width: 8px !important;
-  height: 8px !important;
-  background-color: var(--bg-tertiary) !important;
-  border: 2px solid var(--border-color) !important;
-  transition: all 0.2s;
+/* ポートリストエリア */
+.node-ports-list {
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(0, 0, 0, 0.15);
 }
 
-.node-handle:hover {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
-  transform: scale(1.2);
+.node-port-row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-color);
+  height: 28px;
 }
 
-/* ハンドルラベル（ポート名） */
-.handle-label {
-  position: absolute;
+.port-name-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: bold;
+}
+
+.port-ip-label {
   font-family: var(--font-mono);
   font-size: 9px;
   color: var(--text-muted);
-  pointer-events: none;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.label-top {
-  top: -16px;
-  left: 50%;
-  transform: translateX(-50%);
+/* 重ね合わせ二重ハンドル用CSS */
+.node-handle {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-radius: 50% !important;
+  margin: 0 !important;
+  transition: all 0.2s;
 }
 
-.label-right {
-  right: -28px;
-  top: 50%;
-  transform: translateY(-50%);
+/* 左右配置の厳密化 */
+.node-handle.left {
+  left: -5px !important;
 }
 
-.label-bottom {
-  bottom: -16px;
-  left: 50%;
-  transform: translateX(-50%);
+.node-handle.right {
+  right: -5px !important;
 }
 
-.label-left {
-  left: -28px;
-  top: 50%;
-  transform: translateY(-50%);
+/* 共通Sourceハンドル（見た目の青い丸ポチ） */
+.node-handle.source-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background-color: var(--bg-tertiary) !important;
+  border: 1.5px solid var(--border-color) !important;
+  z-index: 10 !important;
+}
+
+/* 共通Targetハンドル（ヒット用の完全透明なやや大きめの丸） */
+.node-handle.target-handle {
+  width: 16px !important;
+  height: 16px !important;
+  background-color: transparent !important;
+  border: none !important;
+  z-index: 5 !important;
+}
+
+/* ホバー時に綺麗に光らせる */
+.node-port-row:hover .node-handle.source-handle {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 6px var(--color-primary);
+  transform: translateY(-50%) scale(1.2) !important;
+}
+
+/* 接続（ドラッグ）線が伸ばされている間のみ、ドロップを受け付けるためにTargetハンドルを最前面に持ってくる */
+.react-flow--connection-calculating .node-handle.target-handle {
+  z-index: 20 !important;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--color-success);
+    opacity: 0.8;
+  }
+  50% {
+    box-shadow: 0 0 10px var(--color-success);
+    opacity: 1;
+  }
 }

@@ -31,6 +31,8 @@ interface TopologyState {
   updateNodeData: (nodeId: string, data: Partial<RouterNodeData> | Partial<HostNodeData> | any) => void;
   updateEdgeData: (edgeId: string, data: Partial<NetworkEdgeData>) => void;
   setTopology: (nodes: Node[], edges: Edge[]) => void;
+  addPort: (nodeId: string) => void;
+  deletePort: (nodeId: string, portName: string) => void;
 }
 
 const initialRouterData = (label: string): RouterNodeData => ({
@@ -107,7 +109,7 @@ export const useTopologyStore = create<TopologyState>((set) => ({
 
   onConnect: (connection: Connection) => {
     set((state) => {
-      const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(src|tgt)$/, '') : 'eth0';
+      const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth0';
       const sourcePort = cleanHandle(connection.sourceHandle);
       const targetPort = cleanHandle(connection.targetHandle);
 
@@ -309,5 +311,56 @@ export const useTopologyStore = create<TopologyState>((set) => ({
 
   setTopology: (nodes: Node[], edges: Edge[]) => {
     set({ nodes, edges, selectedNodeId: null, selectedEdgeId: null });
+  },
+
+  addPort: (nodeId: string) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) => {
+        if (node.id === nodeId && node.type === 'router') {
+          const data = node.data as RouterNodeData;
+          const currentMax = data.interfaces.reduce((max, i) => {
+            const num = parseInt(i.name.replace('eth', ''), 10);
+            return isNaN(num) ? max : Math.max(max, num);
+          }, -1);
+          const nextIndex = currentMax + 1;
+          const nextPortName = `eth${nextIndex}`;
+          return {
+            ...node,
+            data: {
+              ...data,
+              interfaces: [
+                ...data.interfaces,
+                { id: nextPortName, name: nextPortName, ipAddress: '', netmask: '' }
+              ]
+            }
+          };
+        }
+        return node;
+      })
+    }));
+  },
+
+  deletePort: (nodeId: string, portName: string) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) => {
+        if (node.id === nodeId && node.type === 'router') {
+          const data = node.data as RouterNodeData;
+          return {
+            ...node,
+            data: {
+              ...data,
+              interfaces: data.interfaces.filter(i => i.name !== portName)
+            }
+          };
+        }
+        return node;
+      }),
+      edges: state.edges.filter((edge) => {
+        const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : '';
+        if (edge.source === nodeId && cleanHandle(edge.sourceHandle) === portName) return false;
+        if (edge.target === nodeId && cleanHandle(edge.targetHandle) === portName) return false;
+        return true;
+      })
+    }));
   },
 }));
