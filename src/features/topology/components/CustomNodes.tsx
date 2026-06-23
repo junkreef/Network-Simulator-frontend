@@ -83,30 +83,30 @@ export const HostNode = ({ data, selected }: NodeProps<HostNodeData>) => {
           <Handle 
             type="target" 
             position={Position.Left} 
-            id="eth0-left-tgt" 
+            id="eth1-left-tgt" 
             className="node-handle target-handle left" 
           />
           <Handle 
             type="source" 
             position={Position.Left} 
-            id="eth0-left-src" 
+            id="eth1-left-src" 
             className="node-handle source-handle left" 
           />
 
-          <span className="port-name-label">eth0</span>
+          <span className="port-name-label">eth1</span>
           <span className="port-ip-label">{data.ipAddress || 'no IP'}</span>
 
           {/* 右側のハンドルペア (完全に重ねる) */}
           <Handle 
             type="target" 
             position={Position.Right} 
-            id="eth0-right-tgt" 
+            id="eth1-right-tgt" 
             className="node-handle target-handle right" 
           />
           <Handle 
             type="source" 
             position={Position.Right} 
-            id="eth0-right-src" 
+            id="eth1-right-src" 
             className="node-handle source-handle right" 
           />
         </div>

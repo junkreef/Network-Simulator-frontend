@@ -51,6 +51,7 @@ export default function Canvas() {
           selectEdge(null);
         }}
         fitView
+        fitViewOptions={{ padding: 0.3 }}
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="rgba(255, 255, 255, 0.05)" />
         <Controls showInteractive={false} className="canvas-controls" />

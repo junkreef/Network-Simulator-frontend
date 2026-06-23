@@ -39,10 +39,10 @@ const initialRouterData = (label: string): RouterNodeData => ({
   label,
   status: 'down',
   interfaces: [
-    { id: 'eth0', name: 'eth0', ipAddress: '', netmask: '' },
     { id: 'eth1', name: 'eth1', ipAddress: '', netmask: '' },
     { id: 'eth2', name: 'eth2', ipAddress: '', netmask: '' },
     { id: 'eth3', name: 'eth3', ipAddress: '', netmask: '' },
+    { id: 'eth4', name: 'eth4', ipAddress: '', netmask: '' },
   ],
   vlanInterfaces: [],
   routing: {
@@ -65,10 +65,10 @@ const initialSwitchData = (label: string): SwitchNodeData => ({
   label,
   status: 'down',
   interfaces: [
-    { id: 'eth0', name: 'eth0', vlanMode: 'access', vlanId: 1, vlanIds: [] },
     { id: 'eth1', name: 'eth1', vlanMode: 'access', vlanId: 1, vlanIds: [] },
     { id: 'eth2', name: 'eth2', vlanMode: 'access', vlanId: 1, vlanIds: [] },
     { id: 'eth3', name: 'eth3', vlanMode: 'access', vlanId: 1, vlanIds: [] },
+    { id: 'eth4', name: 'eth4', vlanMode: 'access', vlanId: 1, vlanIds: [] },
   ],
 });
 
@@ -78,19 +78,19 @@ export const useTopologyStore = create<TopologyState>((set) => ({
     {
       id: 'router-1',
       type: 'router',
-      position: { x: 250, y: 150 },
+      position: { x: 200, y: 250 },
       data: initialRouterData('Router-A'),
     },
     {
       id: 'router-2',
       type: 'router',
-      position: { x: 500, y: 150 },
+      position: { x: 500, y: 250 },
       data: initialRouterData('Router-B'),
     },
     {
       id: 'host-1',
       type: 'host',
-      position: { x: 100, y: 350 },
+      position: { x: 200, y: 500 },
       data: initialHostData('Host-A'),
     },
   ],
@@ -99,9 +99,10 @@ export const useTopologyStore = create<TopologyState>((set) => ({
       id: 'edge-1',
       source: 'router-1',
       target: 'host-1',
-      sourceHandle: 'eth0',
-      targetHandle: 'eth0',
-      data: { sourceInterface: 'eth0', targetInterface: 'eth0' }
+      sourceHandle: 'eth1-left-src',
+      targetHandle: 'eth1-right-tgt',
+      type: 'networkEdge',
+      data: { sourceInterface: 'eth1', targetInterface: 'eth1' }
     }
   ],
   selectedNodeId: null,
@@ -125,8 +126,7 @@ export const useTopologyStore = create<TopologyState>((set) => ({
       const sourcePort = cleanHandle(connection.sourceHandle);
       const targetPort = cleanHandle(connection.targetHandle);
 
-      // 既存のエッジに同じポートが使われていないかチェックし、必要に応じてポートの接続状態を割り当てる
-      const newEdgeId = `edge-${Date.now()}`;
+      const newEdgeId = `edge-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const newEdge: Edge = {
         id: newEdgeId,
         source: connection.source || '',
@@ -246,7 +246,7 @@ export const useTopologyStore = create<TopologyState>((set) => ({
       const newNode: Node = {
         id,
         type,
-        position: { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
+        position: { x: 350 + state.nodes.length * 15, y: 350 + state.nodes.length * 15 },
         data: initialData,
       };
       return {

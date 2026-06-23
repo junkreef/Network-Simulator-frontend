@@ -7,7 +7,7 @@ export interface ApplyResult {
 
 export async function applyTopology(topologyData: any): Promise<ApplyResult> {
   try {
-    const response = await fetch(`${API_BASE_URL}/topology`, {
+    const response = await fetch(`${API_BASE_URL}/topology/deploy`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -31,12 +31,12 @@ export async function applyTopology(topologyData: any): Promise<ApplyResult> {
 
 export async function getNodeStatus(nodeId: string, infoType: string): Promise<string> {
   try {
-    const response = await fetch(`${API_BASE_URL}/nodes/${nodeId}/status?type=${infoType}`);
+    const response = await fetch(`${API_BASE_URL}/nodes/${nodeId}/runtime-info?type=${infoType}`);
     if (!response.ok) {
       throw new Error('ステータス情報の取得に失敗しました。');
     }
     const data = await response.json();
-    return data.output || '';
+    return data.raw_output || data.output || '';
   } catch (error: any) {
     return `Error: ${error.message}`;
   }

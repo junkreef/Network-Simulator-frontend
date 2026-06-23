@@ -25,7 +25,7 @@ export default function PropertyPanel() {
   const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(false);
 
   // VLAN追加用のローカルステート
-  const [vlanParent, setVlanParent] = useState<string>('eth0');
+  const [vlanParent, setVlanParent] = useState<string>('eth1');
   const [vlanIdInput, setVlanIdInput] = useState<string>('');
   const [vlanIpInput, setVlanIpInput] = useState<string>('');
 
@@ -40,14 +40,44 @@ export default function PropertyPanel() {
   const [staticDest, setStaticDest] = useState<string>('');
   const [staticNextHop, setStaticNextHop] = useState<string>('');
 
+  // ルーター物理インターフェースの一時入力用ステート
+  const [interfaceInputs, setInterfaceInputs] = useState<Record<string, string>>({});
+  const [prevNodeId, setPrevNodeId] = useState<string | null>(null);
+  const [prevInterfacesLength, setPrevInterfacesLength] = useState<number>(0);
+
   // 選択中の要素を取得
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
   const selectedEdge = edges.find(e => e.id === selectedEdgeId);
 
-  // 選択が変わったら出力をリセット
+  // 選択が変わったら出力をリセットし、VLAN親ポートのデフォルトを更新
   useEffect(() => {
     setStatusOutput('');
-  }, [selectedNodeId, statusType]);
+    if (selectedNode) {
+      if (selectedNode.type === 'router') {
+        const firstIface = selectedNode.data.interfaces?.[0]?.name || 'eth1';
+        setVlanParent(firstIface);
+
+        const currentLength = selectedNode.data.interfaces?.length || 0;
+        // ノードが切り替わったか、インターフェースの数が変わった場合のみ初期化
+        if (selectedNodeId !== prevNodeId || currentLength !== prevInterfacesLength) {
+          const inputs: Record<string, string> = {};
+          (selectedNode.data.interfaces || []).forEach((iface: any) => {
+            inputs[iface.id] = iface.ipAddress && iface.netmask 
+              ? `${iface.ipAddress}/${iface.netmask}` 
+              : iface.ipAddress || '';
+          });
+          setInterfaceInputs(inputs);
+          setPrevNodeId(selectedNodeId);
+          setPrevInterfacesLength(currentLength);
+        }
+      } else if (selectedNode.type === 'host') {
+        setVlanParent('eth1');
+      }
+    } else {
+      setPrevNodeId(null);
+      setPrevInterfacesLength(0);
+    }
+  }, [selectedNodeId, statusType, selectedNode, prevNodeId, prevInterfacesLength]);
 
   const handleRefreshStatus = async () => {
     if (!selectedNodeId) return;
@@ -145,9 +175,9 @@ export default function PropertyPanel() {
   };
 
   // --- ルーター用ハンドラ ---
-  const handleInterfaceChange = (index: number, field: string, value: string) => {
+  const handleInterfaceChange = (index: number, fields: Record<string, string>) => {
     const updated = [...(nodeData.interfaces || [])];
-    updated[index] = { ...updated[index], [field]: value };
+    updated[index] = { ...updated[index], ...fields };
     updateNodeData(selectedNode.id, { interfaces: updated });
   };
 
@@ -471,13 +501,14 @@ export default function PropertyPanel() {
                       <input
                         type="text"
                         placeholder="IPアドレス/CIDR (e.g. 192.168.1.1/24)"
-                        value={iface.ipAddress && iface.netmask ? `${iface.ipAddress}/${iface.netmask}` : iface.ipAddress || ''}
+                        value={interfaceInputs[iface.id] !== undefined ? interfaceInputs[iface.id] : (iface.ipAddress && iface.netmask ? `${iface.ipAddress}/${iface.netmask}` : iface.ipAddress || '')}
                         onChange={(e) => {
-                          const parts = e.target.value.split('/');
+                          const val = e.target.value;
+                          setInterfaceInputs(prev => ({ ...prev, [iface.id]: val }));
+                          const parts = val.split('/');
                           const ip = parts[0] || '';
                           const mask = parts[1] || '';
-                          handleInterfaceChange(idx, 'ipAddress', ip);
-                          handleInterfaceChange(idx, 'netmask', mask);
+                          handleInterfaceChange(idx, { ipAddress: ip, netmask: mask });
                         }}
                       />
                       <button 
@@ -535,7 +566,7 @@ export default function PropertyPanel() {
                           <option key={i.id} value={i.name}>{i.name}</option>
                         ))
                       ) : (
-                        <option value="eth0">eth0</option>
+                        <option value="eth1">eth1</option>
                       )}
                     </select>
                     <input

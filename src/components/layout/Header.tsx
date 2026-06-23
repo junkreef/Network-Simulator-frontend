@@ -19,131 +19,150 @@ export default function Header() {
   const handleApply = async () => {
     setIsApplying(true);
     
-    // トポロジペイロードのビルド
-    const formattedNodes = nodes.map(node => {
-      if (node.type === 'router') {
-        const data = node.data;
-        const ospfInterfaces = data.routing?.ospf?.interfaces || [];
-        const ospfNetworks: string[] = [];
-        
-        // 物理IPをOSPFネットワークに
-        (data.interfaces || []).forEach((i: any) => {
-          if (ospfInterfaces.includes(i.name) && i.ipAddress && i.netmask) {
-            ospfNetworks.push(`${i.ipAddress}/${i.netmask}`);
-          }
-        });
-        // VLAN IPをOSPFネットワークに
-        (data.vlanInterfaces || []).forEach((v: any) => {
-          if (ospfInterfaces.includes(v.name) && v.ipAddress) {
-            ospfNetworks.push(v.ipAddress);
-          }
-        });
-
-        return {
-          id: node.id,
-          type: 'router',
-          hostname: data.label,
-          interfaces: (data.interfaces || [])
-            .filter((i: any) => i.ipAddress)
-            .map((i: any) => ({
-              name: i.name,
-              ip_address: `${i.ipAddress}/${i.netmask}`,
-            })),
-          vlan_interfaces: (data.vlanInterfaces || []).map((v: any) => ({
-            name: v.name,
-            parent_interface: v.parentInterface,
-            vlan_id: v.vlanId,
-            ip_address: v.ipAddress,
-          })),
-          routing: {
-            ospf: {
-              enabled: data.routing?.ospf?.enabled || false,
-              router_id: data.routing?.ospf?.routerId || '',
-              areas: [
-                {
-                  area_id: data.routing?.ospf?.areaId || '0.0.0.0',
-                  networks: ospfNetworks,
-                }
-              ]
-            },
-            rip: {
-              enabled: data.routing?.rip?.enabled || false,
-              networks: data.routing?.rip?.networks || [],
-            },
-            bgp: {
-              enabled: data.routing?.bgp?.enabled || false,
-              as_number: data.routing?.bgp?.asNumber || 65001,
-              router_id: data.routing?.bgp?.routerId || '',
-              neighbors: (data.routing?.bgp?.neighbors || []).map((n: any) => ({
-                ip_address: n.ipAddress,
-                remote_as: n.remoteAs,
-              })),
-            }
-          },
-          static_routes: (data.staticRoutes || []).map((r: any) => ({
-            destination: r.destination,
-            next_hop: r.nextHop,
-          })),
-        };
-      } else if (node.type === 'switch') {
-        const data = node.data;
-        return {
-          id: node.id,
-          type: 'switch',
-          hostname: data.label,
-          interfaces: (data.interfaces || []).map((i: any) => ({
-            name: i.name,
-            vlan_mode: i.vlanMode || 'none',
-            vlan_id: i.vlanMode === 'access' ? Number(i.vlanId) : undefined,
-            vlan_ids: i.vlanMode === 'trunk' ? (Array.isArray(i.vlanIds) ? i.vlanIds : String(i.vlanIds || '').split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n))) : undefined,
-          })),
-        };
-      } else {
-        const data = node.data;
-        return {
-          id: node.id,
-          type: 'host',
-          hostname: data.label,
-          interfaces: data.ipAddress ? [
-            {
-              name: 'eth0',
-              ip_address: data.ipAddress,
-              gateway: data.gateway || undefined,
-            }
-          ] : [],
-          vlan_interfaces: (data.vlanInterfaces || []).map((v: any) => ({
-            name: v.name,
-            parent_interface: v.parentInterface,
-            vlan_id: v.vlanId,
-            ip_address: v.ipAddress,
-          })),
-        };
-      }
-    });
-
     const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth0';
 
-    const formattedLinks = edges.map(edge => ({
-      id: edge.id,
-      source_node: edge.source,
-      source_interface: cleanHandle(edge.sourceHandle),
-      target_node: edge.target,
-      target_interface: cleanHandle(edge.targetHandle),
-    }));
-
-    const payload = {
-      topology_id: `topo-${Date.now()}`,
-      nodes: formattedNodes,
-      links: formattedLinks,
+    // 1. Build and Deploy Topology Payload
+    const deployPayload = {
+      name: "sim-network",
+      nodes: nodes.map(node => ({
+        name: node.id,
+        type: node.type === 'host' ? 'terminal' : node.type,
+        interfaces: node.type === 'switch' || node.type === 'router'
+          ? (node.data.interfaces || []).map((i: any) => i.name)
+          : ['eth1']
+      })),
+      links: edges.map(edge => ({
+        endpoints: [
+          `${edge.source}:${cleanHandle(edge.sourceHandle)}`,
+          `${edge.target}:${cleanHandle(edge.targetHandle)}`
+        ]
+      }))
     };
 
     try {
-      const result = await applyTopology(payload);
-      if (result.success) {
-        showToast('success', 'トポロジを適用しました。');
-      } else {
-        showToast('error', `適用の失敗: ${result.message}`);
+      // 2. Deploy Topology
+      const deployResult = await applyTopology(deployPayload);
+      const isSuccess = (deployResult as any).status === 'success' || deployResult.success;
+      if (!isSuccess) {
+        showToast('error', `トポロジの適用に失敗しました: ${deployResult.message}`);
+        setIsApplying(false);
+        return;
       }
+
+      // Wait a short moment for containerlab to initialize daemons inside containers before configuring them
+      await new Promise(resolve => setTimeout(resolve, 10000));
+
+      // 3. Configure each node
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+
+      for (const node of nodes) {
+        let configPayload: any = {};
+
+        if (node.type === 'router') {
+          const data = node.data;
+          const ospfInterfaces = data.routing?.ospf?.interfaces || [];
+          const ospfNetworks: string[] = [];
+          
+          (data.interfaces || []).forEach((i: any) => {
+            if (ospfInterfaces.includes(i.name) && i.ipAddress && i.netmask) {
+              ospfNetworks.push(`${i.ipAddress}/${i.netmask}`);
+            }
+          });
+          (data.vlanInterfaces || []).forEach((v: any) => {
+            if (ospfInterfaces.includes(v.name) && v.ipAddress) {
+              ospfNetworks.push(v.ipAddress);
+            }
+          });
+
+          configPayload = {
+            interfaces: (data.interfaces || [])
+              .filter((i: any) => i.ipAddress)
+              .map((i: any) => ({
+                name: i.name,
+                ip_address: `${i.ipAddress}/${i.netmask}`,
+              })),
+            vlan_interfaces: (data.vlanInterfaces || []).map((v: any) => ({
+              name: v.name,
+              parent: v.parentInterface,
+              vlan_id: Number(v.vlanId),
+              ip_address: v.ipAddress,
+            })),
+            routing: {
+              ospf: {
+                enabled: data.routing?.ospf?.enabled || false,
+                router_id: data.routing?.ospf?.routerId || '',
+                areas: [
+                  {
+                    area_id: data.routing?.ospf?.areaId || '0.0.0.0',
+                    networks: ospfNetworks,
+                  }
+                ]
+              },
+              rip: {
+                enabled: data.routing?.rip?.enabled || false,
+                networks: data.routing?.rip?.networks || [],
+              },
+              bgp: {
+                enabled: data.routing?.bgp?.enabled || false,
+                as_number: Number(data.routing?.bgp?.asNumber || 65001),
+                router_id: data.routing?.bgp?.routerId || '',
+                neighbors: (data.routing?.bgp?.neighbors || []).map((n: any) => ({
+                  ip_address: n.ipAddress,
+                  remote_as: Number(n.remoteAs),
+                })),
+              }
+            },
+            static_routes: (data.staticRoutes || []).map((r: any) => ({
+              destination: r.destination,
+              next_hop: r.nextHop,
+            })),
+          };
+        } else if (node.type === 'switch') {
+          const data = node.data;
+          configPayload = {
+            interfaces: (data.interfaces || []).map((i: any) => ({
+              name: i.name,
+              vlan_mode: i.vlanMode || 'none',
+              vlan_id: i.vlanMode === 'access' ? Number(i.vlanId) : undefined,
+              vlan_ids: i.vlanMode === 'trunk' ? (Array.isArray(i.vlanIds) ? i.vlanIds : String(i.vlanIds || '').split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n))) : undefined,
+            })),
+            vlan_interfaces: [],
+            routing: null
+          };
+        } else {
+          const data = node.data;
+          configPayload = {
+            interfaces: data.ipAddress ? [
+              {
+                name: 'eth1',
+                ip_address: data.ipAddress,
+              }
+            ] : [],
+            vlan_interfaces: [],
+            routing: null
+          };
+        }
+
+        const response = await fetch(`${API_BASE_URL}/nodes/${node.id}/configure`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(configPayload),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`${node.data.label || node.id} の設定適用に失敗しました: ${errorData.detail || 'Error'}`);
+        }
+      }
+
+      // Update node statuses to 'up' in UI state
+      nodes.forEach(n => {
+        useTopologyStore.getState().updateNodeData(n.id, { status: 'up' });
+      });
+
+      showToast('success', 'トポロジを適用しました。');
     } catch (err: any) {
       showToast('error', `適用の失敗: ${err.message || err}`);
     } finally {

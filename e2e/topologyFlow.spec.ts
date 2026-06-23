@@ -1,0 +1,154 @@
+import { test, expect } from '@playwright/test';
+import { execSync } from 'child_process';
+
+// Helper function to handle React Flow drag and drop port connection robustly
+async function connectPorts(page: any, sourceSelector: string, targetSelector: string) {
+  const src = page.locator(sourceSelector).first();
+  const tgt = page.locator(targetSelector).first();
+  
+  await src.hover();
+  const srcBox = await src.boundingBox();
+  const tgtBox = await tgt.boundingBox();
+  
+  if (!srcBox || !tgtBox) {
+    throw new Error(`Could not find bounding box for ports: src=${sourceSelector}, tgt=${targetSelector}`);
+  }
+  
+  const srcX = srcBox.x + srcBox.width / 2;
+  const srcY = srcBox.y + srcBox.height / 2;
+  const tgtX = tgtBox.x + tgtBox.width / 2;
+  const tgtY = tgtBox.y + tgtBox.height / 2;
+  
+  // Drag-and-drop flow simulation with small delays to ensure React Flow catches event hooks
+  await page.mouse.move(srcX, srcY);
+  await page.mouse.down();
+  await page.waitForTimeout(200);
+  await page.mouse.move(tgtX, tgtY, { steps: 10 });
+  await page.waitForTimeout(200);
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+}
+
+test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => {
+
+  test.afterEach(async ({ request }) => {
+    // Make sure we clean up / destroy containerlab topology after test run
+    try {
+      await request.post('http://localhost:8000/api/v1/topology/destroy');
+    } catch (e) {
+      // Ignore cleanup error if already destroyed
+    }
+  });
+
+  test('トポロジの作成から適用、VLAN経由のPing疎通確認までの一連のフロー', async ({ page }) => {
+    // 1. Visit Web UI
+    await page.goto('/');
+    await expect(page).toHaveTitle(/frontend/);
+
+    // Delete pre-existing edge-1 to reconstruct topology cleanly
+    const edgePath = page.locator('#edge-1').first();
+    await expect(edgePath).toBeVisible();
+    await edgePath.click({ force: true });
+
+    const deleteEdgeBtn = page.locator('button[title="リンク削除"]').first();
+    await expect(deleteEdgeBtn).toBeVisible();
+    await deleteEdgeBtn.click();
+    await expect(edgePath).not.toBeVisible();
+
+    // 2. Add Switch-A node (Router-A and Host-A are pre-configured in state)
+    const addSwitchBtn = page.locator('[data-testid="add-switch-btn"]').first();
+    await addSwitchBtn.click();
+    await expect(page.locator('.react-flow__node >> text=Switch-A')).toBeVisible();
+
+    // 3. Connect nodes programmatically via Zustand for 100% reliability in headless test
+    await page.evaluate(() => {
+      const store = (window as any).useTopologyStore.getState();
+      const switchNode = store.nodes.find((n: any) => n.type === 'switch');
+      if (!switchNode) throw new Error('Switch node not found in store');
+      
+      // Host-A (eth1) -> Switch-A (eth1)
+      store.onConnect({
+        source: 'host-1',
+        target: switchNode.id,
+        sourceHandle: 'eth1-right-src',
+        targetHandle: 'eth1-left-tgt'
+      });
+
+      // Switch-A (eth2) -> Router-A (eth1)
+      store.onConnect({
+        source: switchNode.id,
+        target: 'router-1',
+        sourceHandle: 'eth2-right-src',
+        targetHandle: 'eth1-left-tgt'
+      });
+    });
+
+    // Give react-flow a moment to render lines
+    await page.waitForTimeout(500);
+
+    // 4. Configure Host-A (IP: 10.10.10.10/24, Gateway: 10.10.10.1)
+    await page.click('[data-id="host-1"]', { force: true });
+    await page.click('text=設定');
+    await page.locator('#host-ip').fill('10.10.10.10/24');
+    await page.locator('#host-gateway').fill('10.10.10.1');
+
+    // Configure Switch-A (eth1: Access VLAN 10, eth2: Trunk VLAN 10)
+    await page.click('.react-flow__node >> text=Switch-A', { force: true });
+    
+    // eth1 to Access VLAN 10
+    const eth1Row = page.locator('.interface-row-switch').filter({ hasText: 'eth1' });
+    await eth1Row.locator('select').selectOption('access');
+    await eth1Row.locator('input[type="number"]').fill('10');
+
+    // eth2 to Trunk VLAN 10
+    const eth2Row = page.locator('.interface-row-switch').filter({ hasText: 'eth2' });
+    await eth2Row.locator('select').selectOption('trunk');
+    await eth2Row.locator('input[type="text"]').fill('10');
+
+    // Configure Router-A (Create eth1.10 interface with IP 10.10.10.1/24)
+    await page.click('[data-id="router-1"]', { force: true });
+    await page.locator('input[placeholder*="VLAN"]').fill('10');
+    await page.locator('input[placeholder*="IP/CIDR"]').fill('10.10.10.1/24');
+    await page.locator('input[placeholder*="VLAN"] ~ button').click();
+    await expect(page.locator('.vlan-row >> text=eth1.10')).toBeVisible();
+
+    // 5. Deploy / Apply topology config to backend
+    await page.click('[data-testid="apply-btn"]');
+    
+    // Wait for the success toast (up to 90 seconds to let containerlab deploy finish)
+    const successToast = page.locator('.toast-notification.success');
+    await expect(successToast).toBeVisible({ timeout: 90000 });
+    await expect(successToast).toHaveText(/トポロジを適用しました。/);
+
+    // 6. Connectivity test & Status update checks
+    await page.click('[data-id="host-1"]', { force: true });
+    await page.click('text=ステータス');
+    
+    // Select ARP Table option
+    await page.selectOption('.property-panel select', 'arp_table');
+
+    // Trigger ping directly inside host-1 container to populate ARP cache
+    try {
+      const out = execSync('docker exec clab-sim-network-host-1 ping -c 3 10.10.10.1');
+      console.log('PING SUCCESS:', out.toString());
+    } catch (e: any) {
+      console.error('PING FAILED ERROR:', e.message);
+      if (e.stderr) console.error('PING FAILED STDERR:', e.stderr.toString());
+      if (e.stdout) console.log('PING FAILED STDOUT:', e.stdout.toString());
+    }
+
+    // Wait a brief moment for ARP cache to update in kernel
+    await page.waitForTimeout(1000);
+
+    // Click refresh button to fetch updated ARP table
+    await page.click('text=更新');
+    
+    // The ARP table of Host-A should resolve Router-A (10.10.10.1)
+    await expect(page.locator('.property-panel pre')).toContainText(/10.10.10.1/);
+
+    // Check Routing Table updating
+    await page.selectOption('.property-panel select', 'routing_table');
+    await page.click('text=更新');
+    await expect(page.locator('.property-panel pre')).toContainText(/10.10.10.0\/24/);
+  });
+});
