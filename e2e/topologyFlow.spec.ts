@@ -147,5 +147,6 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await page.selectOption('.property-panel select', 'routing_table');
     await page.click('text=更新');
     await expect(page.locator('.property-panel pre')).toContainText(/10.10.10.0\/24/);
+    await expect(page.locator('.property-panel pre')).toContainText(/default via 10.10.10.1/);
   });
 });

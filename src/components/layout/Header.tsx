@@ -139,7 +139,8 @@ export default function Header() {
               }
             ] : [],
             vlan_interfaces: [],
-            routing: null
+            routing: null,
+            gateway: data.gateway || undefined
           };
         }
 
