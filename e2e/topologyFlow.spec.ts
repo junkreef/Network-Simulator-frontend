@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { execSync } from 'child_process';
 
 // Helper function to handle React Flow drag and drop port connection robustly
 async function connectPorts(page: any, sourceSelector: string, targetSelector: string) {
@@ -127,18 +126,16 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     // Select ARP Table option
     await page.selectOption('.property-panel select', 'arp_table');
 
-    // Trigger ping directly inside host-1 container to populate ARP cache
-    try {
-      const out = execSync('docker exec clab-sim-network-host-1 ping -c 3 10.10.10.1');
-      console.log('PING SUCCESS:', out.toString());
-    } catch (e: any) {
-      console.error('PING FAILED ERROR:', e.message);
-      if (e.stderr) console.error('PING FAILED STDERR:', e.stderr.toString());
-      if (e.stdout) console.log('PING FAILED STDOUT:', e.stdout.toString());
-    }
+    // Focus the hidden textarea of Xterm.js to type the ping command via WebSocket
+    const xtermTextarea = page.locator('.xterm-helper-textarea').first();
+    await expect(xtermTextarea).toBeVisible();
+    await xtermTextarea.focus();
+    
+    // Send command characters sequentially to simulate typing and trigger WebSocket transmission
+    await xtermTextarea.pressSequentially('ping -c 3 10.10.10.1\r', { delay: 50 });
 
-    // Wait a brief moment for ARP cache to update in kernel
-    await page.waitForTimeout(1000);
+    // Wait for the ping to complete inside the container through WebSocket path
+    await page.waitForTimeout(4000);
 
     // Click refresh button to fetch updated ARP table
     await page.click('text=更新');
