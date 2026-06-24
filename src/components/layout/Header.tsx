@@ -21,7 +21,7 @@ export default function Header() {
   const handleApply = async () => {
     setIsApplying(true);
     
-    const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth0';
+    const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth1';
 
     // 1. Build and Deploy Topology Payload
     const deployPayload = {
@@ -35,8 +35,8 @@ export default function Header() {
       })),
       links: edges.map(edge => ({
         endpoints: [
-          `${edge.source}:${cleanHandle(edge.sourceHandle)}`,
-          `${edge.target}:${cleanHandle(edge.targetHandle)}`
+          `${edge.source}:${edge.data?.sourceInterface || cleanHandle(edge.sourceHandle)}`,
+          `${edge.target}:${edge.data?.targetInterface || cleanHandle(edge.targetHandle)}`
         ]
       }))
     };

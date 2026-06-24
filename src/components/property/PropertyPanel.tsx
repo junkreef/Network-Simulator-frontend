@@ -42,6 +42,8 @@ export default function PropertyPanel() {
 
   // ルーター物理インターフェースの一時入力用ステート
   const [interfaceInputs, setInterfaceInputs] = useState<Record<string, string>>({});
+  // スイッチトランクポートVLAN入力の一時用ステート
+  const [vlanIdsInputs, setVlanIdsInputs] = useState<Record<string, string>>({});
   const [prevNodeId, setPrevNodeId] = useState<string | null>(null);
   const [prevInterfacesLength, setPrevInterfacesLength] = useState<number>(0);
 
@@ -67,6 +69,17 @@ export default function PropertyPanel() {
               : iface.ipAddress || '';
           });
           setInterfaceInputs(inputs);
+          setPrevNodeId(selectedNodeId);
+          setPrevInterfacesLength(currentLength);
+        }
+      } else if (selectedNode.type === 'switch') {
+        const currentLength = selectedNode.data.interfaces?.length || 0;
+        if (selectedNodeId !== prevNodeId || currentLength !== prevInterfacesLength) {
+          const inputs: Record<string, string> = {};
+          (selectedNode.data.interfaces || []).forEach((iface: any) => {
+            inputs[iface.id] = Array.isArray(iface.vlanIds) ? iface.vlanIds.join(',') : iface.vlanIds || '';
+          });
+          setVlanIdsInputs(inputs);
           setPrevNodeId(selectedNodeId);
           setPrevInterfacesLength(currentLength);
         }
@@ -451,9 +464,10 @@ export default function PropertyPanel() {
                             <input
                               type="text"
                               placeholder="e.g. 10,20"
-                              value={Array.isArray(iface.vlanIds) ? iface.vlanIds.join(',') : iface.vlanIds || ''}
+                              value={vlanIdsInputs[iface.id] !== undefined ? vlanIdsInputs[iface.id] : (Array.isArray(iface.vlanIds) ? iface.vlanIds.join(',') : iface.vlanIds || '')}
                               onChange={(e) => {
                                 const val = e.target.value;
+                                setVlanIdsInputs(prev => ({ ...prev, [iface.id]: val }));
                                 const ids = val.split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n));
                                 const updated = [...(nodeData.interfaces || [])];
                                 updated[idx] = { ...updated[idx], vlanIds: ids };

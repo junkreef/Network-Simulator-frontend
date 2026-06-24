@@ -122,7 +122,7 @@ export const useTopologyStore = create<TopologyState>((set) => ({
 
   onConnect: (connection: Connection) => {
     set((state) => {
-      const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth0';
+      const cleanHandle = (h: string | null | undefined) => h ? h.replace(/-(left|right)-(src|tgt)$/, '') : 'eth1';
       const sourcePort = cleanHandle(connection.sourceHandle);
       const targetPort = cleanHandle(connection.targetHandle);
 
