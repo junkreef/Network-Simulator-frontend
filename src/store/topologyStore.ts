@@ -14,12 +14,17 @@ import type {
   EdgeChange 
 } from 'reactflow';
 import type { RouterNodeData, HostNodeData, NetworkEdgeData, SwitchNodeData } from '../types/topology';
+import { getTopologyState, saveTopologyState } from '../api/client';
 
 interface TopologyState {
   nodes: Node[];
   edges: Edge[];
+  deployedNodes: Node[];
+  deployedEdges: Edge[];
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
+  hasChanges: boolean;
+  isSaving: boolean;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: (connection: Connection) => void;
@@ -30,9 +35,12 @@ interface TopologyState {
   deleteEdge: (id: string) => void;
   updateNodeData: (nodeId: string, data: Partial<RouterNodeData> | Partial<HostNodeData> | Partial<SwitchNodeData> | any) => void;
   updateEdgeData: (edgeId: string, data: Partial<NetworkEdgeData>) => void;
-  setTopology: (nodes: Node[], edges: Edge[]) => void;
+  setTopology: (nodes: Node[], edges: Edge[]) => Promise<void>;
+  setDeployedState: (nodes: Node[], edges: Edge[]) => void;
   addPort: (nodeId: string) => void;
   deletePort: (nodeId: string, portName: string) => void;
+  saveState: (deployed?: boolean) => Promise<void>;
+  loadState: () => Promise<void>;
 }
 
 const initialRouterData = (label: string): RouterNodeData => ({
@@ -73,7 +81,69 @@ const initialSwitchData = (label: string): SwitchNodeData => ({
 });
 
 
-export const useTopologyStore = create<TopologyState>((set) => ({
+function cleanNodeForComparison(node: any) {
+  const { position, positionAbsolute, width, height, selected, dragging, ...rest } = node;
+  const cleanedData = rest.data ? { ...rest.data } : {};
+  delete cleanedData.status;
+  return {
+    id: rest.id,
+    type: rest.type,
+    data: cleanedData
+  };
+}
+
+function cleanEdgeForComparison(edge: any) {
+  const { selected, ...rest } = edge;
+  return rest;
+}
+
+export function checkHasChanges(nodes: any[], edges: any[], deployedNodes: any[], deployedEdges: any[]): boolean {
+  const cleanNodes = nodes.map(cleanNodeForComparison).sort((a, b) => a.id.localeCompare(b.id));
+  const cleanDeployedNodes = deployedNodes.map(cleanNodeForComparison).sort((a, b) => a.id.localeCompare(b.id));
+
+  const cleanEdges = edges.map(cleanEdgeForComparison).sort((a, b) => a.id.localeCompare(b.id));
+  const cleanDeployedEdges = deployedEdges.map(cleanEdgeForComparison).sort((a, b) => a.id.localeCompare(b.id));
+
+  return JSON.stringify(cleanNodes) !== JSON.stringify(cleanDeployedNodes) ||
+         JSON.stringify(cleanEdges) !== JSON.stringify(cleanDeployedEdges);
+}
+
+let autoSaveTimeoutId: any = null;
+
+function triggerAutoSave() {
+  if (autoSaveTimeoutId) {
+    clearTimeout(autoSaveTimeoutId);
+  }
+  autoSaveTimeoutId = setTimeout(() => {
+    useTopologyStore.getState().saveState(false);
+  }, 2000);
+}
+
+export const useTopologyStore = create<TopologyState>((rawSet) => {
+  const set = (
+    fn: Partial<TopologyState> | ((state: TopologyState) => Partial<TopologyState> | TopologyState)
+  ) => {
+    rawSet((state) => {
+      const nextState = typeof fn === 'function' ? fn(state) : fn;
+      const newNodes = nextState.nodes !== undefined ? nextState.nodes : state.nodes;
+      const newEdges = nextState.edges !== undefined ? nextState.edges : state.edges;
+      const newDeployedNodes = nextState.deployedNodes !== undefined ? nextState.deployedNodes : state.deployedNodes;
+      const newDeployedEdges = nextState.deployedEdges !== undefined ? nextState.deployedEdges : state.deployedEdges;
+      
+      const hasChanges = checkHasChanges(newNodes, newEdges, newDeployedNodes, newDeployedEdges);
+      
+      if (nextState.nodes !== undefined || nextState.edges !== undefined) {
+        triggerAutoSave();
+      }
+      
+      return {
+        ...nextState,
+        hasChanges
+      };
+    });
+  };
+
+  return {
   nodes: [
     {
       id: 'router-1',
@@ -390,8 +460,38 @@ export const useTopologyStore = create<TopologyState>((set) => ({
     }));
   },
 
-  setTopology: (nodes: Node[], edges: Edge[]) => {
-    set({ nodes, edges, selectedNodeId: null, selectedEdgeId: null });
+  setTopology: async (nodes: Node[], edges: Edge[]) => {
+    let activeNodes: string[] = [];
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+      const statusRes = await fetch(`${API_BASE_URL}/topology/status`);
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        if (statusData.status === 'running') {
+          activeNodes = (statusData.nodes || []).map((n: any) => n.name);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch topology status during setTopology:', e);
+    }
+
+    const mergedNodes = nodes.map((node) => {
+      const isUp = activeNodes.some(name => name === node.id || name.endsWith(`-${node.id}`));
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          status: isUp ? 'up' : 'down'
+        }
+      };
+    });
+
+    set({
+      nodes: mergedNodes,
+      edges,
+      selectedNodeId: null,
+      selectedEdgeId: null
+    });
   },
 
   addPort: (nodeId: string) => {
@@ -475,4 +575,87 @@ export const useTopologyStore = create<TopologyState>((set) => ({
       })
     }));
   },
-}));
+
+  deployedNodes: [],
+  deployedEdges: [],
+  hasChanges: false,
+  isSaving: false,
+
+  setDeployedState: (nodes: Node[], edges: Edge[]) => {
+    const deepCopyNodes = JSON.parse(JSON.stringify(nodes));
+    const deepCopyEdges = JSON.parse(JSON.stringify(edges));
+    set({
+      deployedNodes: deepCopyNodes,
+      deployedEdges: deepCopyEdges,
+    });
+  },
+
+  saveState: async (deployed: boolean = false) => {
+    const { nodes, edges } = useTopologyStore.getState();
+    rawSet({ isSaving: true });
+    try {
+      const result = await saveTopologyState({ nodes, edges }, deployed);
+      if (result.success || (result as any).status === 'success') {
+        if (deployed) {
+          const deepCopyNodes = JSON.parse(JSON.stringify(nodes));
+          const deepCopyEdges = JSON.parse(JSON.stringify(edges));
+          rawSet({
+            deployedNodes: deepCopyNodes,
+            deployedEdges: deepCopyEdges,
+            hasChanges: false
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to save state:', e);
+    } finally {
+      rawSet({ isSaving: false });
+    }
+  },
+
+  loadState: async () => {
+    try {
+      const state = await getTopologyState(false);
+      const deployedState = await getTopologyState(true);
+      
+      const loadedNodes = state.nodes || [];
+      const loadedEdges = state.edges || [];
+      const loadedDeployedNodes = deployedState.nodes || [];
+      const loadedDeployedEdges = deployedState.edges || [];
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+      const statusRes = await fetch(`${API_BASE_URL}/topology/status`);
+      let activeNodes: string[] = [];
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        if (statusData.status === 'running') {
+          activeNodes = (statusData.nodes || []).map((n: any) => n.name);
+        }
+      }
+      
+      const mergedNodes = loadedNodes.map((node: any) => {
+        const isUp = activeNodes.some(name => name === node.id || name.endsWith(`-${node.id}`));
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            status: isUp ? 'up' : 'down'
+          }
+        };
+      });
+
+      const nextHasChanges = checkHasChanges(mergedNodes, loadedEdges, loadedDeployedNodes, loadedDeployedEdges);
+
+      rawSet({
+        nodes: mergedNodes,
+        edges: loadedEdges,
+        deployedNodes: loadedDeployedNodes,
+        deployedEdges: loadedDeployedEdges,
+        hasChanges: nextHasChanges
+      });
+    } catch (e) {
+      console.error('Failed to load state:', e);
+    }
+  },
+};
+});

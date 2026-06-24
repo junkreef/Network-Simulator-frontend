@@ -6,7 +6,7 @@ import JsonEditorModal from '../json/JsonEditorModal';
 import './Header.css';
 
 export default function Header() {
-  const { nodes, edges } = useTopologyStore();
+  const { nodes, edges, hasChanges, saveState } = useTopologyStore();
   const [isApplying, setIsApplying] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -192,6 +192,9 @@ export default function Header() {
         useTopologyStore.getState().updateNodeData(n.id, { status: 'up' });
       });
 
+      // Save as deployed state to clear change indicator
+      await saveState(true);
+
       showToast('success', 'トポロジを適用しました。');
     } catch (err: any) {
       showToast('error', `適用の失敗: ${err.message || err}`);
@@ -203,7 +206,15 @@ export default function Header() {
   return (
     <header className="app-header" data-testid="app-header">
       <div className="header-brand">
-        <h1 className="header-title">Cybernet OS Network Simulator</h1>
+        <div className="title-row" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h1 className="header-title">Cybernet OS Network Simulator</h1>
+          {hasChanges && (
+            <span className="unsaved-badge" data-testid="unsaved-badge">
+              <AlertTriangle size={12} />
+              未適用
+            </span>
+          )}
+        </div>
         <span className="header-subtitle">Container-based Topology Lab</span>
       </div>
 

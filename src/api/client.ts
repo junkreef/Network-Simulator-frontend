@@ -41,3 +41,40 @@ export async function getNodeStatus(nodeId: string, infoType: string): Promise<s
     return `Error: ${error.message}`;
   }
 }
+
+export async function getTopologyState(deployed: boolean = false): Promise<any> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/topology/state?deployed=${deployed}`);
+    if (!response.ok) {
+      throw new Error('トポロジ状態の取得に失敗しました。');
+    }
+    return await response.json();
+  } catch (error: any) {
+    console.error('getTopologyState error:', error);
+    return { nodes: [], edges: [] };
+  }
+}
+
+export async function saveTopologyState(topologyData: any, deployed: boolean = false): Promise<ApplyResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/topology/state?deployed=${deployed}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(topologyData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'トポロジ状態の保存に失敗しました。');
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || '接続エラーが発生しました。',
+    };
+  }
+}

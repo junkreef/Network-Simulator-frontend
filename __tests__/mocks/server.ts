@@ -34,6 +34,18 @@ export const handlers = [
       output: `Mock configuration output for ${params.id}`,
     });
   }),
+
+  http.get('/api/v1/topology/state', () => {
+    return HttpResponse.json({ nodes: [], edges: [] });
+  }),
+
+  http.post('/api/v1/topology/state', async () => {
+    return HttpResponse.json({ success: true, message: 'Saved successfully' });
+  }),
+
+  http.get('/api/v1/topology/status', () => {
+    return HttpResponse.json({ status: 'stopped', nodes: [] });
+  }),
 ];
 
 export const server = setupServer(...handlers);

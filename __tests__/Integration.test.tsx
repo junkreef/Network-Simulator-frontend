@@ -141,4 +141,66 @@ describe('Topology Apply Integration Flow', () => {
     expect(lastConfigureBody.static_routes[0].destination).toBe('10.0.0.0/24');
     expect(lastConfigureBody.static_routes[0].next_hop).toBe('192.168.1.254');
   });
+
+  it('未適用インジケーター（バッジ）がトポロジの変更に応じて表示・非表示になること', async () => {
+    // 1. 初期状態（適用済みと一致している状態）
+    useTopologyStore.setState({
+      nodes: [
+        {
+          id: 'router-1',
+          type: 'router',
+          position: { x: 0, y: 0 },
+          data: { label: 'R1', status: 'down' }
+        }
+      ],
+      edges: [],
+      deployedNodes: [
+        {
+          id: 'router-1',
+          type: 'router',
+          position: { x: 0, y: 0 },
+          data: { label: 'R1', status: 'down' }
+        }
+      ],
+      deployedEdges: [],
+      hasChanges: false
+    });
+
+    render(<App />);
+
+    // 「未適用」バッジが表示されていないこと
+    expect(screen.queryByTestId('unsaved-badge')).not.toBeInTheDocument();
+
+    // 2. 座標のみを更新する（ドラッグなどを想定）
+    useTopologyStore.getState().onNodesChange([
+      {
+        type: 'position',
+        id: 'router-1',
+        position: { x: 100, y: 100 }
+      }
+    ]);
+    
+    // 座標変更だけなら「未適用」バッジは表示されないこと
+    expect(useTopologyStore.getState().hasChanges).toBe(false);
+    expect(screen.queryByTestId('unsaved-badge')).not.toBeInTheDocument();
+
+    // 3. 論理データ（ラベル等）を更新する
+    useTopologyStore.getState().updateNodeData('router-1', { label: 'New R1' });
+
+    // 「未適用」バッジが表示されること
+    expect(useTopologyStore.getState().hasChanges).toBe(true);
+    await waitFor(() => {
+      expect(screen.getByTestId('unsaved-badge')).toBeInTheDocument();
+    });
+
+    // 4. 適用ボタンをクリック
+    const applyButton = screen.getByRole('button', { name: /適用/i });
+    fireEvent.click(applyButton);
+
+    // 適用完了後に「未適用」バッジが消えること
+    await waitFor(() => {
+      expect(screen.queryByTestId('unsaved-badge')).not.toBeInTheDocument();
+    });
+    expect(useTopologyStore.getState().hasChanges).toBe(false);
+  });
 });

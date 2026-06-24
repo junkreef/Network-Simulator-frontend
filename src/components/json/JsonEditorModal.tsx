@@ -39,7 +39,7 @@ export default function JsonEditorModal({ isOpen, onClose }: JsonEditorModalProp
     }
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     try {
       const parsed = JSON.parse(jsonText);
       if (!parsed || typeof parsed !== 'object') {
@@ -53,7 +53,7 @@ export default function JsonEditorModal({ isOpen, onClose }: JsonEditorModalProp
       }
 
       // トポロジ更新
-      setTopology(parsed.nodes, parsed.edges);
+      await setTopology(parsed.nodes, parsed.edges);
       setErrorMsg(null);
       onClose();
     } catch (err: any) {
