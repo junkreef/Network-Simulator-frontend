@@ -149,4 +149,266 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await expect(page.locator('.property-panel pre')).toContainText(/10.10.10.0\/24/);
     await expect(page.locator('.property-panel pre')).toContainText(/default via 10.10.10.1/);
   });
+
+  test('OSPF動的ルーティングのE2Eテスト', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle(/frontend/);
+
+    // 1. OSPF設定をZustand経由で流し込む
+    await page.evaluate(() => {
+      const store = (window as any).useTopologyStore.getState();
+      
+      const cleanNodes = store.nodes
+        .filter((n: any) => n.id !== 'host-1')
+        .map((n: any) => {
+          if (n.id === 'router-1') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.1', netmask: '24', connectedTo: 'router-2' }
+                ],
+                routing: {
+                  ospf: {
+                    enabled: true,
+                    routerId: '1.1.1.1',
+                    areaId: '0.0.0.0',
+                    interfaces: ['eth2']
+                  },
+                  rip: { enabled: false, networks: [], interfaces: [] },
+                  bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] }
+                }
+              }
+            };
+          }
+          if (n.id === 'router-2') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.2', netmask: '24', connectedTo: 'router-1' }
+                ],
+                routing: {
+                  ospf: {
+                    enabled: true,
+                    routerId: '2.2.2.2',
+                    areaId: '0.0.0.0',
+                    interfaces: ['eth2']
+                  },
+                  rip: { enabled: false, networks: [], interfaces: [] },
+                  bgp: { enabled: false, asNumber: 65002, routerId: '', neighbors: [] }
+                }
+              }
+            };
+          }
+          return n;
+        });
+
+      const cleanEdges = [
+        {
+          id: 'edge-r1-r2',
+          source: 'router-1',
+          target: 'router-2',
+          sourceHandle: 'eth2-right-src',
+          targetHandle: 'eth2-left-tgt',
+          type: 'networkEdge',
+          data: {
+            sourceInterface: 'eth2',
+            targetInterface: 'eth2'
+          }
+        }
+      ];
+      
+      store.setTopology(cleanNodes, cleanEdges);
+    });
+
+    // 2. 適用
+    await page.click('[data-testid="apply-btn"]');
+    const successToast = page.locator('.toast-notification.success');
+    await expect(successToast).toBeVisible({ timeout: 90000 });
+
+    // 3. ルーターAを選択して、OSPFネイバーを確認
+    await page.click('[data-id="router-1"]', { force: true });
+    await page.click('text=ステータス');
+    await page.selectOption('.property-panel select', 'ospf_neighbors');
+    
+    // OSPFの隣接関係構築に数秒かかるため、少し待機してから更新する
+    await page.waitForTimeout(50000);
+    await page.click('text=更新');
+
+    // ネイバーとして 2.2.2.2 (Router-B) が検出されているかアサート
+    await expect(page.locator('.property-panel pre')).toContainText(/2\.2\.2\.2/);
+  });
+
+  test('BGP動的ルーティングのE2Eテスト', async ({ page }) => {
+    await page.goto('/');
+    
+    await page.evaluate(() => {
+      const store = (window as any).useTopologyStore.getState();
+      
+      const cleanNodes = store.nodes
+        .filter((n: any) => n.id !== 'host-1')
+        .map((n: any) => {
+          if (n.id === 'router-1') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.1', netmask: '24', connectedTo: 'router-2' }
+                ],
+                routing: {
+                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
+                  rip: { enabled: false, networks: [], interfaces: [] },
+                  bgp: {
+                    enabled: true,
+                    asNumber: 65001,
+                    routerId: '1.1.1.1',
+                    neighbors: [{ ipAddress: '10.0.12.2', remoteAs: 65002 }]
+                  }
+                }
+              }
+            };
+          }
+          if (n.id === 'router-2') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.2', netmask: '24', connectedTo: 'router-1' }
+                ],
+                routing: {
+                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
+                  rip: { enabled: false, networks: [], interfaces: [] },
+                  bgp: {
+                    enabled: true,
+                    asNumber: 65002,
+                    routerId: '2.2.2.2',
+                    neighbors: [{ ipAddress: '10.0.12.1', remoteAs: 65001 }]
+                  }
+                }
+              }
+            };
+          }
+          return n;
+        });
+
+      const cleanEdges = [
+        {
+          id: 'edge-r1-r2',
+          source: 'router-1',
+          target: 'router-2',
+          sourceHandle: 'eth2-right-src',
+          targetHandle: 'eth2-left-tgt',
+          type: 'networkEdge',
+          data: {
+            sourceInterface: 'eth2',
+            targetInterface: 'eth2'
+          }
+        }
+      ];
+      
+      store.setTopology(cleanNodes, cleanEdges);
+    });
+
+    await page.click('[data-testid="apply-btn"]');
+    const successToast = page.locator('.toast-notification.success');
+    await expect(successToast).toBeVisible({ timeout: 90000 });
+
+    await page.click('[data-id="router-1"]', { force: true });
+    await page.click('text=ステータス');
+    await page.selectOption('.property-panel select', 'bgp_neighbors');
+    
+    // BGPセッション確立を待つ
+    await page.waitForTimeout(10000);
+    await page.click('text=更新');
+
+    // BGPネイバー 10.0.12.2 が Established (プレフィックス数表示) になっているかアサート
+    // 確立すると末尾が Active / Connect ではなく数値（0など）になります
+    await expect(page.locator('.property-panel pre')).toContainText(/10\.0\.12\.2\s+4\s+65002/);
+  });
+
+  test('静的ルーティング（Static Routes）のE2Eテスト', async ({ page }) => {
+    await page.goto('/');
+    
+    await page.evaluate(() => {
+      const store = (window as any).useTopologyStore.getState();
+      
+      const cleanNodes = store.nodes
+        .filter((n: any) => n.id !== 'host-1')
+        .map((n: any) => {
+          if (n.id === 'router-1') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.1', netmask: '24', connectedTo: 'router-2' }
+                ],
+                routing: {
+                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
+                  rip: { enabled: false, networks: [], interfaces: [] },
+                  bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] }
+                },
+                staticRoutes: [
+                  { destination: '192.168.2.0/24', nextHop: '10.0.12.2' }
+                ]
+              }
+            };
+          }
+          if (n.id === 'router-2') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.2', netmask: '24', connectedTo: 'router-1' }
+                ],
+                routing: {
+                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
+                  rip: { enabled: false, networks: [], interfaces: [] },
+                  bgp: { enabled: false, asNumber: 65002, routerId: '', neighbors: [] }
+                },
+                staticRoutes: [
+                  { destination: '192.168.1.0/24', nextHop: '10.0.12.1' }
+                ]
+              }
+            };
+          }
+          return n;
+        });
+
+      const cleanEdges = [
+        {
+          id: 'edge-r1-r2',
+          source: 'router-1',
+          target: 'router-2',
+          sourceHandle: 'eth2-right-src',
+          targetHandle: 'eth2-left-tgt',
+          type: 'networkEdge',
+          data: {
+            sourceInterface: 'eth2',
+            targetInterface: 'eth2'
+          }
+        }
+      ];
+      
+      store.setTopology(cleanNodes, cleanEdges);
+    });
+
+    await page.click('[data-testid="apply-btn"]');
+    const successToast = page.locator('.toast-notification.success');
+    await expect(successToast).toBeVisible({ timeout: 90000 });
+
+    await page.click('[data-id="router-1"]', { force: true });
+    await page.click('text=ステータス');
+    await page.selectOption('.property-panel select', 'routing_table');
+    await page.click('text=更新');
+
+    // 静的ルートが適用されているかアサート
+    await expect(page.locator('.property-panel pre')).toContainText(/192\.168\.2\.0\/24/);
+  });
 });

@@ -2,10 +2,10 @@ import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  http.post('/api/v1/topology', async ({ request }) => {
+  http.post('/api/v1/topology/deploy', async ({ request }) => {
     try {
       const body = (await request.json()) as any;
-      if (body.topology_id && Array.isArray(body.nodes)) {
+      if (body.name && Array.isArray(body.nodes)) {
         return HttpResponse.json({ success: true, message: 'Applied successfully' });
       }
       return new HttpResponse(JSON.stringify({ detail: 'Invalid Schema' }), {
@@ -20,11 +20,18 @@ export const handlers = [
     }
   }),
 
-  http.get('/api/v1/nodes/:id/status', ({ params, request }) => {
+  http.get('/api/v1/nodes/:id/runtime-info', ({ params, request }) => {
     const url = new URL(request.url);
     const infoType = url.searchParams.get('type') || 'routing_table';
     return HttpResponse.json({
-      output: `Mock Output for Node ${params.id} [${infoType}]\n10.0.0.0/24 directly connected\nO* 172.16.0.0/16 via OSPF neighbor`,
+      raw_output: `Mock Output for Node ${params.id} [${infoType}]\n10.0.0.0/24 directly connected\nO* 172.16.0.0/16 via OSPF neighbor`,
+    });
+  }),
+
+  http.post('/api/v1/nodes/:id/configure', async ({ params, request }) => {
+    return HttpResponse.json({
+      status: 'success',
+      output: `Mock configuration output for ${params.id}`,
     });
   }),
 ];
