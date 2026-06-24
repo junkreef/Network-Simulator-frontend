@@ -49,7 +49,12 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
 
   test('トポロジの作成から適用、VLAN経由のPing疎通確認までの一連のフロー', async ({ page }) => {
     // 1. Visit Web UI
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page).toHaveTitle(/frontend/);
 
     // Delete pre-existing edge-1 to reconstruct topology cleanly
@@ -163,12 +168,16 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('OSPF動的ルーティングのE2Eテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
-    await expect(page).toHaveTitle(/frontend/);
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
 
     // 1. OSPF設定をZustand経由で流し込む
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const store = (window as any).useTopologyStore.getState();
       
       const cleanNodes = store.nodes
@@ -234,7 +243,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
         }
       ];
       
-      store.setTopology(cleanNodes, cleanEdges);
+      await store.setTopology(cleanNodes, cleanEdges);
     });
 
     // 2. 適用
@@ -256,10 +265,15 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('BGP動的ルーティングのE2Eテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
     
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const store = (window as any).useTopologyStore.getState();
       
       const cleanNodes = store.nodes
@@ -325,7 +339,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
         }
       ];
       
-      store.setTopology(cleanNodes, cleanEdges);
+      await store.setTopology(cleanNodes, cleanEdges);
     });
 
     await page.click('[data-testid="apply-btn"]');
@@ -346,10 +360,15 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('静的ルーティング（Static Routes）のE2Eテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
     
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const store = (window as any).useTopologyStore.getState();
       
       const cleanNodes = store.nodes
@@ -411,7 +430,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
         }
       ];
       
-      store.setTopology(cleanNodes, cleanEdges);
+      await store.setTopology(cleanNodes, cleanEdges);
     });
 
     await page.click('[data-testid="apply-btn"]');
@@ -431,7 +450,12 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('環境リセットボタンの動作確認 E2Eテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page).toHaveTitle(/frontend/);
 
     // 適用ボタンを押して適用する（ダミーでも適当にコンテナ起動が走る）
@@ -456,7 +480,12 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('VLANサブインターフェイス追加後のインライン編集テスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page).toHaveTitle(/frontend/);
 
     // Router-A を選択
@@ -495,13 +524,18 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('ノード自動命名規則の改善（未使用アルファベットの割り当て）のテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await expect(page).toHaveTitle(/frontend/);
 
     await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
     await expect(page.locator('.react-flow__node >> text=Router-B')).toBeVisible();
 
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const store = (window as any).useTopologyStore.getState();
       const cleanNodes = store.nodes.filter((n: any) => n.id !== 'router-2');
       
@@ -524,7 +558,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
           staticRoutes: []
         }
       });
-      store.setTopology(cleanNodes, store.edges.filter((edge: any) => edge.source !== 'router-2' && edge.target !== 'router-2'));
+      await store.setTopology(cleanNodes, store.edges.filter((edge: any) => edge.source !== 'router-2' && edge.target !== 'router-2'));
     });
 
     // React Flow のノード描画ラグ対策
@@ -543,7 +577,12 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('接続済みインターフェイスのハンドル非表示と新規接続不可のテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
     await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
     await page.click('[data-id="router-1"]', { force: true });
 
     const connectedPortRow = page.locator('.node-port-row').filter({ hasText: 'eth1' }).first();
