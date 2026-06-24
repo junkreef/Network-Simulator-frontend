@@ -30,6 +30,14 @@ async function connectPorts(page: any, sourceSelector: string, targetSelector: s
 
 test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => {
 
+  test.beforeEach(async ({ request }) => {
+    try {
+      await request.delete('http://localhost:8000/api/v1/topology/state');
+    } catch (e) {
+      // Ignore reset failure
+    }
+  });
+
   test.afterEach(async ({ request }) => {
     // Make sure we clean up / destroy containerlab topology after test run
     try {

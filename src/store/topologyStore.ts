@@ -14,7 +14,7 @@ import type {
   EdgeChange 
 } from 'reactflow';
 import type { RouterNodeData, HostNodeData, NetworkEdgeData, SwitchNodeData } from '../types/topology';
-import { getTopologyState, saveTopologyState } from '../api/client';
+import { getTopologyState, saveTopologyState, deleteTopologyState } from '../api/client';
 
 interface TopologyState {
   nodes: Node[];
@@ -41,6 +41,7 @@ interface TopologyState {
   deletePort: (nodeId: string, portName: string) => void;
   saveState: (deployed?: boolean) => Promise<void>;
   loadState: () => Promise<void>;
+  resetTopologyState: () => Promise<void>;
 }
 
 const initialRouterData = (label: string): RouterNodeData => ({
@@ -655,6 +656,56 @@ export const useTopologyStore = create<TopologyState>((rawSet) => {
       });
     } catch (e) {
       console.error('Failed to load state:', e);
+    }
+  },
+
+  resetTopologyState: async () => {
+    try {
+      await deleteTopologyState();
+      
+      const defaultNodes: Node[] = [
+        {
+          id: 'router-1',
+          type: 'router',
+          position: { x: 200, y: 250 },
+          data: initialRouterData('Router-A'),
+        },
+        {
+          id: 'router-2',
+          type: 'router',
+          position: { x: 500, y: 250 },
+          data: initialRouterData('Router-B'),
+        },
+        {
+          id: 'host-1',
+          type: 'host',
+          position: { x: 200, y: 500 },
+          data: initialHostData('Host-A'),
+        },
+      ];
+      const defaultEdges: Edge[] = [
+        {
+          id: 'edge-1',
+          source: 'router-1',
+          target: 'host-1',
+          sourceHandle: 'eth1-left-src',
+          targetHandle: 'eth1-right-tgt',
+          type: 'networkEdge',
+          data: { sourceInterface: 'eth1', targetInterface: 'eth1' }
+        }
+      ];
+
+      rawSet({
+        nodes: defaultNodes,
+        edges: defaultEdges,
+        deployedNodes: [],
+        deployedEdges: [],
+        selectedNodeId: null,
+        selectedEdgeId: null,
+        hasChanges: true
+      });
+    } catch (e) {
+      console.error('Failed to reset topology state:', e);
     }
   },
 };

@@ -78,3 +78,23 @@ export async function saveTopologyState(topologyData: any, deployed: boolean = f
     };
   }
 }
+
+export async function deleteTopologyState(): Promise<ApplyResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/topology/state`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'トポロジ状態のリセットに失敗しました。');
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || '接続エラーが発生しました。',
+    };
+  }
+}

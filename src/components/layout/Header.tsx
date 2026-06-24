@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useTopologyStore } from '../../store/topologyStore';
 import { applyTopology } from '../../api/client';
-import { Play, Check, AlertTriangle, RefreshCw, FileJson, Trash2 } from 'lucide-react';
+import { Play, Check, AlertTriangle, RefreshCw, FileJson, Trash2, RotateCcw } from 'lucide-react';
 import JsonEditorModal from '../json/JsonEditorModal';
 import './Header.css';
 
 export default function Header() {
-  const { nodes, edges, hasChanges, saveState } = useTopologyStore();
+  const { nodes, edges, hasChanges, saveState, resetTopologyState } = useTopologyStore();
   const [isApplying, setIsApplying] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isResettingTopology, setIsResettingTopology] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
 
@@ -17,6 +18,27 @@ export default function Header() {
     setTimeout(() => {
       setToast(null);
     }, 4000);
+  };
+
+  const handleResetTopology = async () => {
+    if (!confirm('警告: トポロジの構成を初期状態（デフォルト）に戻します。構築済みの環境も破棄されます。よろしいですか？')) {
+      return;
+    }
+    setIsResettingTopology(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+      await fetch(`${API_BASE_URL}/topology/destroy`, {
+        method: 'POST',
+      });
+      
+      await resetTopologyState();
+      
+      showToast('success', 'トポロジを初期状態にリセットしました。');
+    } catch (err: any) {
+      showToast('error', `リセットの失敗: ${err.message || err}`);
+    } finally {
+      setIsResettingTopology(false);
+    }
   };
 
   const handleReset = async () => {
@@ -231,8 +253,28 @@ export default function Header() {
         </button>
         <button
           type="button"
+          onClick={handleResetTopology}
+          disabled={isResettingTopology || isApplying || isResetting}
+          className={`reset-topology-button ${isResettingTopology ? 'resetting' : ''}`}
+          data-testid="reset-topology-btn"
+          title="トポロジの初期化 (デフォルト状態に戻す)"
+        >
+          {isResettingTopology ? (
+            <>
+              <RefreshCw size={16} className="spin-icon" />
+              初期化中...
+            </>
+          ) : (
+            <>
+              <RotateCcw size={16} />
+              トポロジ初期化
+            </>
+          )}
+        </button>
+        <button
+          type="button"
           onClick={handleReset}
-          disabled={isResetting || isApplying}
+          disabled={isResetting || isApplying || isResettingTopology}
           className={`reset-button ${isResetting ? 'resetting' : ''}`}
           data-testid="reset-btn"
           title="コンテナの停止と削除"
