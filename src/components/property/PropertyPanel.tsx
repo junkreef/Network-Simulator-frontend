@@ -44,8 +44,14 @@ export default function PropertyPanel() {
   const [interfaceInputs, setInterfaceInputs] = useState<Record<string, string>>({});
   // スイッチトランクポートVLAN入力の一時用ステート
   const [vlanIdsInputs, setVlanIdsInputs] = useState<Record<string, string>>({});
+  
+  // ルーターVLANサブインターフェース一時入力用ステート
+  const [vlanIdInputs, setVlanIdInputs] = useState<Record<number, string>>({});
+  const [vlanIpInputs, setVlanIpInputs] = useState<Record<number, string>>({});
+  
   const [prevNodeId, setPrevNodeId] = useState<string | null>(null);
   const [prevInterfacesLength, setPrevInterfacesLength] = useState<number>(0);
+  const [prevVlansLength, setPrevVlansLength] = useState<number>(0);
 
   // 選択中の要素を取得
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
@@ -72,6 +78,20 @@ export default function PropertyPanel() {
           setPrevNodeId(selectedNodeId);
           setPrevInterfacesLength(currentLength);
         }
+
+        // VLAN一時ステート初期化
+        const currentVlansLength = selectedNode.data.vlanInterfaces?.length || 0;
+        if (selectedNodeId !== prevNodeId || currentVlansLength !== prevVlansLength) {
+          const idInputs: Record<number, string> = {};
+          const ipInputs: Record<number, string> = {};
+          (selectedNode.data.vlanInterfaces || []).forEach((v: any, idx: number) => {
+            idInputs[idx] = String(v.vlanId);
+            ipInputs[idx] = v.ipAddress;
+          });
+          setVlanIdInputs(idInputs);
+          setVlanIpInputs(ipInputs);
+          setPrevVlansLength(currentVlansLength);
+        }
       } else if (selectedNode.type === 'switch') {
         const currentLength = selectedNode.data.interfaces?.length || 0;
         if (selectedNodeId !== prevNodeId || currentLength !== prevInterfacesLength) {
@@ -89,8 +109,9 @@ export default function PropertyPanel() {
     } else {
       setPrevNodeId(null);
       setPrevInterfacesLength(0);
+      setPrevVlansLength(0);
     }
-  }, [selectedNodeId, statusType, selectedNode, prevNodeId, prevInterfacesLength]);
+  }, [selectedNodeId, statusType, selectedNode, prevNodeId, prevInterfacesLength, prevVlansLength]);
 
   const handleRefreshStatus = async () => {
     if (!selectedNodeId) return;
@@ -218,6 +239,34 @@ export default function PropertyPanel() {
     const currentVlans = nodeData.vlanInterfaces || [];
     updateNodeData(selectedNode.id, {
       vlanInterfaces: currentVlans.filter((v: VlanInterfaceData) => v.name !== name),
+    });
+  };
+
+  const handleVlanFieldChange = (index: number, field: keyof VlanInterfaceData, value: any) => {
+    const updated = [...(nodeData.vlanInterfaces || [])];
+    const target = updated[index];
+    if (!target) return;
+
+    const oldName = target.name;
+    const newVlan = { ...target, [field]: value };
+
+    if (field === 'parentInterface' || field === 'vlanId') {
+      newVlan.name = `${newVlan.parentInterface}.${newVlan.vlanId}`;
+    }
+
+    updated[index] = newVlan;
+
+    const newRouting = { ...nodeData.routing };
+    if (newRouting.ospf?.interfaces?.includes(oldName)) {
+      newRouting.ospf.interfaces = newRouting.ospf.interfaces.map((i: string) => i === oldName ? newVlan.name : i);
+    }
+    if (newRouting.rip?.interfaces?.includes(oldName)) {
+      newRouting.rip.interfaces = newRouting.rip.interfaces.map((i: string) => i === oldName ? newVlan.name : i);
+    }
+
+    updateNodeData(selectedNode.id, {
+      vlanInterfaces: updated,
+      routing: newRouting,
     });
   };
 
@@ -603,11 +652,53 @@ export default function PropertyPanel() {
                   </div>
 
                   <div className="vlan-list">
-                    {(nodeData.vlanInterfaces || []).map((vlan: VlanInterfaceData) => (
-                      <div className="vlan-row" key={vlan.name}>
-                        <span className="vlan-name">{vlan.name}</span>
-                        <span className="vlan-ip">{vlan.ipAddress}</span>
-                        <button type="button" onClick={() => handleRemoveVlan(vlan.name)} className="icon-btn-remove">
+                    {(nodeData.vlanInterfaces || []).map((vlan: VlanInterfaceData, idx: number) => (
+                      <div className="vlan-row" key={idx}>
+                        <select
+                          value={vlan.parentInterface}
+                          onChange={(e) => handleVlanFieldChange(idx, 'parentInterface', e.target.value)}
+                        >
+                          {isRouter ? (
+                            (nodeData.interfaces || []).map((i: any) => (
+                              <option key={i.id} value={i.name}>{i.name}</option>
+                            ))
+                          ) : (
+                            <option value="eth1">eth1</option>
+                          )}
+                        </select>
+                        <input
+                          type="number"
+                          placeholder="VLAN ID"
+                          min="1"
+                          max="4094"
+                          value={vlanIdInputs[idx] !== undefined ? vlanIdInputs[idx] : vlan.vlanId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setVlanIdInputs(prev => ({ ...prev, [idx]: val }));
+                            const parsed = parseInt(val, 10);
+                            if (!isNaN(parsed) && parsed >= 1 && parsed <= 4094) {
+                              handleVlanFieldChange(idx, 'vlanId', parsed);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const val = e.target.value;
+                            const parsed = parseInt(val, 10);
+                            if (isNaN(parsed) || parsed < 1 || parsed > 4094) {
+                              setVlanIdInputs(prev => ({ ...prev, [idx]: String(vlan.vlanId) }));
+                            }
+                          }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="IPアドレス/CIDR"
+                          value={vlanIpInputs[idx] !== undefined ? vlanIpInputs[idx] : vlan.ipAddress}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setVlanIpInputs(prev => ({ ...prev, [idx]: val }));
+                            handleVlanFieldChange(idx, 'ipAddress', val);
+                          }}
+                        />
+                        <button type="button" onClick={() => handleRemoveVlan(vlan.name)} className="icon-btn-remove" title="削除">
                           <X size={12} />
                         </button>
                       </div>

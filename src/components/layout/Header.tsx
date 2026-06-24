@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useTopologyStore } from '../../store/topologyStore';
 import { applyTopology } from '../../api/client';
-import { Play, Check, AlertTriangle, RefreshCw, FileJson } from 'lucide-react';
+import { Play, Check, AlertTriangle, RefreshCw, FileJson, Trash2 } from 'lucide-react';
 import JsonEditorModal from '../json/JsonEditorModal';
 import './Header.css';
 
 export default function Header() {
   const { nodes, edges } = useTopologyStore();
   const [isApplying, setIsApplying] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isJsonModalOpen, setIsJsonModalOpen] = useState(false);
 
@@ -16,6 +17,32 @@ export default function Header() {
     setTimeout(() => {
       setToast(null);
     }, 4000);
+  };
+
+  const handleReset = async () => {
+    if (!confirm('警告: 構築済みのすべてのコンテナを停止・削除し、初期状態に戻します。よろしいですか？')) {
+      return;
+    }
+    setIsResetting(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+      const response = await fetch(`${API_BASE_URL}/topology/destroy`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('リセットに失敗しました。');
+      }
+
+      nodes.forEach(n => {
+        useTopologyStore.getState().updateNodeData(n.id, { status: 'down' });
+      });
+
+      showToast('success', '環境をリセットしました。');
+    } catch (err: any) {
+      showToast('error', `リセットの失敗: ${err.message || err}`);
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const handleApply = async () => {
@@ -193,8 +220,28 @@ export default function Header() {
         </button>
         <button
           type="button"
+          onClick={handleReset}
+          disabled={isResetting || isApplying}
+          className={`reset-button ${isResetting ? 'resetting' : ''}`}
+          data-testid="reset-btn"
+          title="コンテナの停止と削除"
+        >
+          {isResetting ? (
+            <>
+              <RefreshCw size={16} className="spin-icon" />
+              リセット中...
+            </>
+          ) : (
+            <>
+              <Trash2 size={16} />
+              環境リセット
+            </>
+          )}
+        </button>
+        <button
+          type="button"
           onClick={handleApply}
-          disabled={isApplying}
+          disabled={isApplying || isResetting}
           className={`apply-button ${isApplying ? 'applying' : ''}`}
           data-testid="apply-btn"
         >

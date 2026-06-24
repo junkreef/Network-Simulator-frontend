@@ -109,7 +109,11 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await page.locator('input[placeholder*="VLAN"]').fill('10');
     await page.locator('input[placeholder*="IP/CIDR"]').fill('10.10.10.1/24');
     await page.locator('input[placeholder*="VLAN"] ~ button').click();
-    await expect(page.locator('.vlan-row >> text=eth1.10')).toBeVisible();
+    
+    const vlanRow = page.locator('.vlan-row').first();
+    await expect(vlanRow.locator('select')).toHaveValue('eth1');
+    await expect(vlanRow.locator('input[type="number"]')).toHaveValue('10');
+    await expect(vlanRow.locator('input[type="text"]')).toHaveValue('10.10.10.1/24');
 
     // 5. Deploy / Apply topology config to backend
     await page.click('[data-testid="apply-btn"]');
@@ -410,5 +414,128 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
 
     // 静的ルートが適用されているかアサート
     await expect(page.locator('.property-panel pre')).toContainText(/192\.168\.2\.0\/24/);
+  });
+
+  test('環境リセットボタンの動作確認 E2Eテスト', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle(/frontend/);
+
+    // 適用ボタンを押して適用する（ダミーでも適当にコンテナ起動が走る）
+    await page.click('[data-testid="apply-btn"]');
+    const successToast = page.locator('.toast-notification.success');
+    await expect(successToast).toBeVisible({ timeout: 90000 });
+
+    // ダイアログが出たら自動的に accept するように設定
+    page.once('dialog', dialog => dialog.accept());
+
+    // 環境リセットボタンをクリック
+    await page.click('[data-testid="reset-btn"]');
+
+    // リセット成功トーストが表示されることを期待
+    const resetToast = page.locator('.toast-notification.success');
+    await expect(resetToast).toBeVisible({ timeout: 30000 });
+    await expect(resetToast).toHaveText(/環境をリセットしました。/);
+
+    // 全ノードが down (Offline) になっているか確認
+    await expect(page.locator('[data-id="router-1"]')).toContainText(/Offline/);
+    await expect(page.locator('[data-id="router-2"]')).toContainText(/Offline/);
+  });
+
+  test('VLANサブインターフェイス追加後のインライン編集テスト', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle(/frontend/);
+
+    // Router-A を選択
+    await page.click('[data-id="router-1"]', { force: true });
+
+    // VLANを追加
+    await page.locator('input[placeholder*="VLAN"]').fill('10');
+    await page.locator('input[placeholder*="IP/CIDR"]').fill('10.10.10.1/24');
+    await page.locator('input[placeholder*="VLAN"] ~ button').click();
+
+    // 追加された行が存在することを確認
+    const vlanRow = page.locator('.vlan-row').first();
+    await expect(vlanRow.locator('select')).toHaveValue('eth1');
+    await expect(vlanRow.locator('input[type="number"]')).toHaveValue('10');
+    await expect(vlanRow.locator('input[type="text"]')).toHaveValue('10.10.10.1/24');
+
+    // VLAN情報をインライン編集
+    // 親インターフェイスを eth2 に
+    await vlanRow.locator('select').selectOption('eth2');
+    // VLAN IDを 20 に
+    await vlanRow.locator('input[type="number"]').fill('20');
+    // IPアドレスを 20.20.20.1/24 に
+    await vlanRow.locator('input[type="text"]').fill('20.20.20.1/24');
+
+    // 編集結果が Zustand 側で正しく同期されているか確認する（ブラウザ上のグローバル Zustand state で検証）
+    const vlanData = await page.evaluate(() => {
+      const store = (window as any).useTopologyStore.getState();
+      const r1 = store.nodes.find((n: any) => n.id === 'router-1');
+      return r1.data.vlanInterfaces[0];
+    });
+
+    expect(vlanData.name).toBe('eth2.20');
+    expect(vlanData.parentInterface).toBe('eth2');
+    expect(vlanData.vlanId).toBe(20);
+    expect(vlanData.ipAddress).toBe('20.20.20.1/24');
+  });
+
+  test('ノード自動命名規則の改善（未使用アルファベットの割り当て）のテスト', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle(/frontend/);
+
+    await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
+    await expect(page.locator('.react-flow__node >> text=Router-B')).toBeVisible();
+
+    await page.evaluate(() => {
+      const store = (window as any).useTopologyStore.getState();
+      const cleanNodes = store.nodes.filter((n: any) => n.id !== 'router-2');
+      
+      cleanNodes.push({
+        id: 'router-temp-E',
+        type: 'router',
+        position: { x: 500, y: 250 },
+        data: {
+          label: 'Router-E',
+          status: 'down',
+          interfaces: [
+            { id: 'eth1', name: 'eth1', ipAddress: '', netmask: '' }
+          ],
+          vlanInterfaces: [],
+          routing: {
+            ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
+            rip: { enabled: false, networks: [], interfaces: [] },
+            bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] },
+          },
+          staticRoutes: []
+        }
+      });
+      store.setTopology(cleanNodes, store.edges.filter((edge: any) => edge.source !== 'router-2' && edge.target !== 'router-2'));
+    });
+
+    await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
+    await expect(page.locator('.react-flow__node >> text=Router-E')).toBeVisible();
+    await expect(page.locator('.react-flow__node >> text=Router-B')).not.toBeVisible();
+
+    const addRouterBtn = page.locator('[data-testid="add-router-btn"]').first();
+    await addRouterBtn.click();
+
+    await expect(page.locator('.react-flow__node >> text=Router-B')).toBeVisible();
+    const routerECount = await page.locator('.react-flow__node >> text=Router-E').count();
+    expect(routerECount).toBe(1);
+  });
+
+  test('接続済みインターフェイスのハンドル非表示と新規接続不可のテスト', async ({ page }) => {
+    await page.goto('/');
+    await page.click('[data-id="router-1"]', { force: true });
+
+    const connectedPortRow = page.locator('.node-port-row').filter({ hasText: 'eth1' }).first();
+    const handles = connectedPortRow.locator('.node-handle');
+    const count = await handles.count();
+    for (let i = 0; i < count; i++) {
+      const handle = handles.nth(i);
+      await expect(handle).toHaveClass(/connected/);
+      await expect(handle).toBeHidden();
+    }
   });
 });

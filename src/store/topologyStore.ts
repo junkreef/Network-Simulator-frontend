@@ -231,11 +231,29 @@ export const useTopologyStore = create<TopologyState>((set) => ({
   addNode: (type: 'router' | 'host' | 'switch') => {
     set((state) => {
       const id = `${type}-${Date.now()}`;
+      
+      const getNextUnusedLetter = (nodeType: 'router' | 'host' | 'switch') => {
+        const prefix = nodeType === 'router' ? 'Router-' : nodeType === 'host' ? 'Host-' : 'Switch-';
+        const existingLabels = state.nodes
+          .filter(n => n.type === nodeType)
+          .map(n => n.data.label || '');
+        
+        for (let i = 0; i < 26; i++) {
+          const letter = String.fromCharCode(65 + i);
+          const candidateLabel = `${prefix}${letter}`;
+          if (!existingLabels.includes(candidateLabel)) {
+            return letter;
+          }
+        }
+        return String.fromCharCode(65 + (existingLabels.length % 26));
+      };
+
+      const letter = getNextUnusedLetter(type);
       const label = type === 'router' 
-        ? `Router-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'router').length)}` 
+        ? `Router-${letter}` 
         : type === 'host'
-          ? `Host-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'host').length)}`
-          : `Switch-${String.fromCharCode(65 + state.nodes.filter(n => n.type === 'switch').length)}`;
+          ? `Host-${letter}`
+          : `Switch-${letter}`;
       
       const initialData = type === 'router' 
         ? initialRouterData(label) 

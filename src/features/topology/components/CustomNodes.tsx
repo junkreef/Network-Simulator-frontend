@@ -2,10 +2,19 @@ import { Handle, Position } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 import { Network, Laptop, Activity } from 'lucide-react';
 import type { RouterNodeData, HostNodeData, SwitchNodeData } from '../../../types/topology';
+import { useTopologyStore } from '../../../store/topologyStore';
 import './CustomNodes.css';
 
-export const RouterNode = ({ data, selected }: NodeProps<RouterNodeData>) => {
+const checkIsPortConnected = (nodeId: string, portName: string, edges: any[]) => {
+  return edges.some(edge => 
+    (edge.source === nodeId && (edge.data?.sourceInterface === portName || (edge.sourceHandle && edge.sourceHandle.startsWith(`${portName}-`)))) ||
+    (edge.target === nodeId && (edge.data?.targetInterface === portName || (edge.targetHandle && edge.targetHandle.startsWith(`${portName}-`))))
+  );
+};
+
+export const RouterNode = ({ id, data, selected }: NodeProps<RouterNodeData>) => {
   const isUp = data.status === 'up';
+  const edges = useTopologyStore(state => state.edges);
 
   return (
     <div className={`custom-node router-node ${selected ? 'selected' : ''} ${isUp ? 'up' : 'down'}`}>
@@ -22,47 +31,58 @@ export const RouterNode = ({ data, selected }: NodeProps<RouterNodeData>) => {
       
       {/* ポートの動的リスト */}
       <div className="node-ports-list">
-        {(data.interfaces || []).map((iface) => (
-          <div key={iface.name} className="node-port-row">
-            {/* 左側のハンドルペア (完全に重ねる) */}
-            <Handle 
-              type="target" 
-              position={Position.Left} 
-              id={`${iface.name}-left-tgt`} 
-              className="node-handle target-handle left" 
-            />
-            <Handle 
-              type="source" 
-              position={Position.Left} 
-              id={`${iface.name}-left-src`} 
-              className="node-handle source-handle left" 
-            />
+        {(data.interfaces || []).map((iface) => {
+          const isConnected = checkIsPortConnected(id, iface.name, edges);
+          return (
+            <div key={iface.name} className="node-port-row" data-connected={isConnected}>
+              {/* 左側のハンドルペア (完全に重ねる) */}
+              <Handle 
+                type="target" 
+                position={Position.Left} 
+                id={`${iface.name}-left-tgt`} 
+                className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+                isConnectableStart={false}
+              />
+              <Handle 
+                type="source" 
+                position={Position.Left} 
+                id={`${iface.name}-left-src`} 
+                className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+              />
 
-            <span className="port-name-label">{iface.name}</span>
-            <span className="port-ip-label">{iface.ipAddress ? `${iface.ipAddress}/${iface.netmask}` : 'no IP'}</span>
+              <span className="port-name-label">{iface.name}</span>
+              <span className="port-ip-label">{iface.ipAddress ? `${iface.ipAddress}/${iface.netmask}` : 'no IP'}</span>
 
-            {/* 右側のハンドルペア (完全に重ねる) */}
-            <Handle 
-              type="target" 
-              position={Position.Right} 
-              id={`${iface.name}-right-tgt`} 
-              className="node-handle target-handle right" 
-            />
-            <Handle 
-              type="source" 
-              position={Position.Right} 
-              id={`${iface.name}-right-src`} 
-              className="node-handle source-handle right" 
-            />
-          </div>
-        ))}
+              {/* 右側のハンドルペア (完全に重ねる) */}
+              <Handle 
+                type="target" 
+                position={Position.Right} 
+                id={`${iface.name}-right-tgt`} 
+                className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+                isConnectableStart={false}
+              />
+              <Handle 
+                type="source" 
+                position={Position.Right} 
+                id={`${iface.name}-right-src`} 
+                className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 };
 
-export const HostNode = ({ data, selected }: NodeProps<HostNodeData>) => {
+export const HostNode = ({ id, data, selected }: NodeProps<HostNodeData>) => {
   const isUp = data.status === 'up';
+  const edges = useTopologyStore(state => state.edges);
+  const isConnected = checkIsPortConnected(id, 'eth1', edges);
 
   return (
     <div className={`custom-node host-node ${selected ? 'selected' : ''} ${isUp ? 'up' : 'down'}`}>
@@ -78,19 +98,22 @@ export const HostNode = ({ data, selected }: NodeProps<HostNodeData>) => {
       </div>
       
       <div className="node-ports-list">
-        <div className="node-port-row">
+        <div className="node-port-row" data-connected={isConnected}>
           {/* 左側のハンドルペア (完全に重ねる) */}
           <Handle 
             type="target" 
             position={Position.Left} 
             id="eth1-left-tgt" 
-            className="node-handle target-handle left" 
+            className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
+            isConnectable={!isConnected}
+            isConnectableStart={false}
           />
           <Handle 
             type="source" 
             position={Position.Left} 
             id="eth1-left-src" 
-            className="node-handle source-handle left" 
+            className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
+            isConnectable={!isConnected}
           />
 
           <span className="port-name-label">eth1</span>
@@ -101,13 +124,16 @@ export const HostNode = ({ data, selected }: NodeProps<HostNodeData>) => {
             type="target" 
             position={Position.Right} 
             id="eth1-right-tgt" 
-            className="node-handle target-handle right" 
+            className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
+            isConnectable={!isConnected}
+            isConnectableStart={false}
           />
           <Handle 
             type="source" 
             position={Position.Right} 
             id="eth1-right-src" 
-            className="node-handle source-handle right" 
+            className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
+            isConnectable={!isConnected}
           />
         </div>
       </div>
@@ -115,8 +141,9 @@ export const HostNode = ({ data, selected }: NodeProps<HostNodeData>) => {
   );
 };
 
-export const SwitchNode = ({ data, selected }: NodeProps<SwitchNodeData>) => {
+export const SwitchNode = ({ id, data, selected }: NodeProps<SwitchNodeData>) => {
   const isUp = data.status === 'up';
+  const edges = useTopologyStore(state => state.edges);
 
   return (
     <div className={`custom-node switch-node ${selected ? 'selected' : ''} ${isUp ? 'up' : 'down'}`}>
@@ -133,46 +160,55 @@ export const SwitchNode = ({ data, selected }: NodeProps<SwitchNodeData>) => {
       
       {/* ポートの動的リスト */}
       <div className="node-ports-list">
-        {(data.interfaces || []).map((iface) => (
-          <div key={iface.name} className="node-port-row">
-            {/* 左側のハンドルペア (完全に重ねる) */}
-            <Handle 
-              type="target" 
-              position={Position.Left} 
-              id={`${iface.name}-left-tgt`} 
-              className="node-handle target-handle left" 
-            />
-            <Handle 
-              type="source" 
-              position={Position.Left} 
-              id={`${iface.name}-left-src`} 
-              className="node-handle source-handle left" 
-            />
+        {(data.interfaces || []).map((iface) => {
+          const isConnected = checkIsPortConnected(id, iface.name, edges);
+          return (
+            <div key={iface.name} className="node-port-row" data-connected={isConnected}>
+              {/* 左側のハンドルペア (完全に重ねる) */}
+              <Handle 
+                type="target" 
+                position={Position.Left} 
+                id={`${iface.name}-left-tgt`} 
+                className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+                isConnectableStart={false}
+              />
+              <Handle 
+                type="source" 
+                position={Position.Left} 
+                id={`${iface.name}-left-src`} 
+                className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+              />
 
-            <span className="port-name-label">{iface.name}</span>
-            <span className="port-ip-label">
-              {iface.vlanMode === 'access' 
-                ? `VLAN ${iface.vlanId || 1}` 
-                : iface.vlanMode === 'trunk' 
-                  ? `Trunk (${(iface.vlanIds || []).join(',') || 'all'})`
-                  : 'no VLAN'}
-            </span>
+              <span className="port-name-label">{iface.name}</span>
+              <span className="port-ip-label">
+                {iface.vlanMode === 'access' 
+                  ? `VLAN ${iface.vlanId || 1}` 
+                  : iface.vlanMode === 'trunk' 
+                    ? `Trunk (${(iface.vlanIds || []).join(',') || 'all'})`
+                    : 'no VLAN'}
+              </span>
 
-            {/* 右側のハンドルペア (完全に重ねる) */}
-            <Handle 
-              type="target" 
-              position={Position.Right} 
-              id={`${iface.name}-right-tgt`} 
-              className="node-handle target-handle right" 
-            />
-            <Handle 
-              type="source" 
-              position={Position.Right} 
-              id={`${iface.name}-right-src`} 
-              className="node-handle source-handle right" 
-            />
-          </div>
-        ))}
+              {/* 右側のハンドルペア (完全に重ねる) */}
+              <Handle 
+                type="target" 
+                position={Position.Right} 
+                id={`${iface.name}-right-tgt`} 
+                className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+                isConnectableStart={false}
+              />
+              <Handle 
+                type="source" 
+                position={Position.Right} 
+                id={`${iface.name}-right-src`} 
+                className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
+                isConnectable={!isConnected}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
