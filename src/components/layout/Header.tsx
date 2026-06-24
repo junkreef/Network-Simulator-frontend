@@ -101,7 +101,7 @@ export default function Header() {
       }
 
       // Wait a short moment for containerlab to initialize daemons inside containers before configuring them
-      await new Promise(resolve => setTimeout(resolve, (import.meta.env.MODE === 'test' || (window as any).__VITEST__) ? 0 : 10000));
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       // 3. Configure each node
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';

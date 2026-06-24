@@ -165,6 +165,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   test('OSPF動的ルーティングのE2Eテスト', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/frontend/);
+    await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
 
     // 1. OSPF設定をZustand経由で流し込む
     await page.evaluate(() => {
@@ -256,6 +257,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
 
   test('BGP動的ルーティングのE2Eテスト', async ({ page }) => {
     await page.goto('/');
+    await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
     
     await page.evaluate(() => {
       const store = (window as any).useTopologyStore.getState();
@@ -335,7 +337,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await page.selectOption('.property-panel select', 'bgp_neighbors');
     
     // BGPセッション確立を待つ
-    await page.waitForTimeout(10000);
+    await page.waitForTimeout(40000);
     await page.click('text=更新');
 
     // BGPネイバー 10.0.12.2 が Established (プレフィックス数表示) になっているかアサート
@@ -345,6 +347,7 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
 
   test('静的ルーティング（Static Routes）のE2Eテスト', async ({ page }) => {
     await page.goto('/');
+    await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
     
     await page.evaluate(() => {
       const store = (window as any).useTopologyStore.getState();
@@ -418,6 +421,9 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await page.click('[data-id="router-1"]', { force: true });
     await page.click('text=ステータス');
     await page.selectOption('.property-panel select', 'routing_table');
+    
+    // 静的ルートがカーネルに反映されるのを待つ
+    await page.waitForTimeout(5000);
     await page.click('text=更新');
 
     // 静的ルートが適用されているかアサート
@@ -520,6 +526,9 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
       });
       store.setTopology(cleanNodes, store.edges.filter((edge: any) => edge.source !== 'router-2' && edge.target !== 'router-2'));
     });
+
+    // React Flow のノード描画ラグ対策
+    await page.waitForTimeout(1000);
 
     await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
     await expect(page.locator('.react-flow__node >> text=Router-E')).toBeVisible();
