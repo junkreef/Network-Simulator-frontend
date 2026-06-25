@@ -4,6 +4,7 @@ export interface InterfaceData {
   ipAddress: string;
   netmask: string;
   connectedTo?: string; // 接続先ノードID
+  adminState?: 'up' | 'down';
 }
 
 export interface VlanInterfaceData {
@@ -85,6 +86,7 @@ export interface HostNodeData {
   gateway: string;
   connectedTo?: string;
   vlanInterfaces: VlanInterfaceData[];
+  eth1AdminState?: 'up' | 'down';
 }
 
 export interface NetworkEdgeData {
@@ -93,6 +95,7 @@ export interface NetworkEdgeData {
   cost?: number;
   sourceInterface?: string;
   targetInterface?: string;
+  status?: 'up' | 'down';
 }
 
 export interface SwitchInterfaceData {
@@ -102,6 +105,7 @@ export interface SwitchInterfaceData {
   vlanId?: number; // for access mode (1-4094)
   vlanIds?: number[]; // for trunk mode (e.g., [10, 20])
   connectedTo?: string; // connected node ID
+  adminState?: 'up' | 'down';
 }
 
 export interface SwitchNodeData {

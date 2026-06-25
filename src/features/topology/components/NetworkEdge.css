@@ -16,6 +16,18 @@
   filter: drop-shadow(0 0 4px var(--color-primary));
 }
 
+.network-edge-path.down {
+  stroke: #ef4444; /* 赤色 */
+  stroke-dasharray: 4 4; /* 点線 */
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.4));
+}
+
+.network-edge-path.down.selected {
+  stroke: #f87171;
+  filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.6));
+}
+
 .edge-badge-container {
   display: flex;
   flex-direction: column;

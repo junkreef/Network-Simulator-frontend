@@ -626,3 +626,42 @@ input:checked + .slider:before {
   color: var(--text-primary);
 }
 
+/* インターフェース状態トグルボタン */
+.interface-state-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-muted);
+}
+
+.interface-state-btn.up {
+  color: #10b981; /* Opaque Emerald */
+  border-color: rgba(16, 185, 129, 0.3);
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.interface-state-btn.up:hover {
+  background-color: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.interface-state-btn.down {
+  color: #ef4444; /* Opaque Red */
+  border-color: rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.05);
+}
+
+.interface-state-btn.down:hover {
+  background-color: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+

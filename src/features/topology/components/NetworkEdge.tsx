@@ -33,7 +33,7 @@ export default function NetworkEdge({
       <path
         id={id}
         style={style}
-        className={`react-flow__edge-path network-edge-path ${selected ? 'selected' : ''} ${!isConfigured ? 'dashed' : ''}`}
+        className={`react-flow__edge-path network-edge-path ${selected ? 'selected' : ''} ${!isConfigured ? 'dashed' : ''} ${data?.status === 'down' ? 'down' : ''}`}
         d={edgePath}
         markerEnd={markerEnd}
       />

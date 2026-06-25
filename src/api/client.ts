@@ -98,3 +98,26 @@ export async function deleteTopologyState(): Promise<ApplyResult> {
     };
   }
 }
+
+export async function setInterfaceState(nodeId: string, interfaceName: string, state: 'up' | 'down'): Promise<ApplyResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/nodes/${nodeId}/interfaces/${interfaceName}/state?state=${state}`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'インターフェース状態の変更に失敗しました。');
+    }
+
+    return {
+      success: true,
+      message: `インターフェースを ${state} に設定しました。`,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message || '接続エラーが発生しました。',
+    };
+  }
+}

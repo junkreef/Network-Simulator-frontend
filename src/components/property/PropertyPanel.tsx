@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTopologyStore } from '../../store/topologyStore';
-import type { NetworkEdgeData, VlanInterfaceData } from '../../types/topology';
-import { getNodeStatus } from '../../api/client';
-import { Trash2, Plus, X, RefreshCw } from 'lucide-react';
+import type { NetworkEdgeData, VlanInterfaceData, HostNodeData } from '../../types/topology';
+import { getNodeStatus, setInterfaceState } from '../../api/client';
+import { Trash2, Plus, X, RefreshCw, Link, Link2Off } from 'lucide-react';
 import './PropertyPanel.css';
 
 // エリアIDからコントラストの高い一意のHSLカラーを生成するヘルパー関数（ダークテーマ用）
@@ -93,6 +93,35 @@ export default function PropertyPanel() {
   const selectedNode = nodes.find(n => n.id === selectedNodeId);
   const selectedEdge = edges.find(e => e.id === selectedEdgeId);
 
+  // インターフェースの UP/DOWN 状態をトグルするハンドラー
+  const handleInterfaceStateToggle = async (interfaceName: string, currentAdminState: 'up' | 'down' | undefined) => {
+    if (!selectedNode) return;
+    const newState = currentAdminState === 'down' ? 'up' : 'down';
+    
+    try {
+      const result = await setInterfaceState(selectedNode.id, interfaceName, newState);
+      if (result.success) {
+        if (selectedNode.type === 'host') {
+          const data = selectedNode.data as HostNodeData;
+          updateNodeData(selectedNode.id, {
+            ...data,
+            eth1AdminState: newState
+          });
+        } else {
+          const interfaces = [...(selectedNode.data.interfaces || [])];
+          const updated = interfaces.map(i => 
+            i.name === interfaceName ? { ...i, adminState: newState } : i
+          );
+          updateNodeData(selectedNode.id, { interfaces: updated });
+        }
+      } else {
+        alert(`状態変更に失敗しました: ${result.message}`);
+      }
+    } catch (e: any) {
+      alert(`通信エラーが発生しました: ${e.message}`);
+    }
+  };
+
   // 選択が変わったら出力をリセットし、VLAN親ポートのデフォルトを更新
   useEffect(() => {
     setStatusOutput('');
@@ -179,6 +208,46 @@ export default function PropertyPanel() {
       updateEdgeData(selectedEdge.id, { [field]: value });
     };
 
+    const isDeployed = nodes.some(n => n.data.status === 'up');
+
+    const handleEdgeLinkToggle = async () => {
+      const isCurrentlyDown = edgeData.status === 'down';
+      const targetState = isCurrentlyDown ? 'up' : 'down';
+      
+      const sourceNode = nodes.find(n => n.id === selectedEdge.source);
+      if (!sourceNode) return;
+
+      const sourceInterface = edgeData.sourceInterface;
+      if (!sourceInterface) return;
+
+      try {
+        const result = await setInterfaceState(selectedEdge.source, sourceInterface, targetState);
+        if (result.success) {
+          // エッジ状態の更新
+          handleEdgeChange('status', targetState);
+          
+          // ノード側のインターフェースの adminState も同期する
+          if (sourceNode.type === 'host') {
+            const hostData = sourceNode.data as HostNodeData;
+            updateNodeData(sourceNode.id, {
+              ...hostData,
+              eth1AdminState: targetState
+            });
+          } else {
+            const interfaces = [...(sourceNode.data.interfaces || [])];
+            const updated = interfaces.map((i: any) => 
+              i.name === sourceInterface ? { ...i, adminState: targetState } : i
+            );
+            updateNodeData(sourceNode.id, { interfaces: updated });
+          }
+        } else {
+          alert(`リンク状態の変更に失敗しました: ${result.message}`);
+        }
+      } catch (e: any) {
+        alert(`通信エラーが発生しました: ${e.message}`);
+      }
+    };
+
     return (
       <div className="property-panel" data-testid="property-panel-edge">
         <div className="panel-header">
@@ -224,6 +293,40 @@ export default function PropertyPanel() {
               onChange={(e) => handleEdgeChange('cost', e.target.value ? parseInt(e.target.value, 10) : undefined)}
             />
           </div>
+          {isDeployed && (
+            <div className="form-group" style={{ marginTop: '20px', borderTop: '1px dashed var(--border-color)', paddingTop: '16px' }}>
+              <label>データプレーン接続状態</label>
+              <button
+                type="button"
+                onClick={handleEdgeLinkToggle}
+                className={`status-toggle-btn ${edgeData.status === 'down' ? 'down' : 'up'}`}
+                style={{
+                  width: '100%',
+                  marginTop: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  fontWeight: '600'
+                }}
+              >
+                {edgeData.status === 'down' ? (
+                  <>
+                    <Link2Off size={16} /> リンク切断中 (DOWN)
+                  </>
+                ) : (
+                  <>
+                    <Link size={16} /> リンク接続中 (UP)
+                  </>
+                )}
+              </button>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '6px', lineHeight: '1.4' }}>
+                ※ リンクを切断すると、物理的なケーブル抜去をシミュレートし、OSPFの経路切り替えなどの動作を観察できます。
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -670,14 +773,26 @@ export default function PropertyPanel() {
                     <div className="interface-row-switch" key={iface.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '8px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="interface-name" style={{ fontWeight: 'bold' }}>{iface.name}</span>
-                        <button 
-                          type="button" 
-                          onClick={() => deletePort(selectedNode.id, iface.name)}
-                          className="delete-port-btn" 
-                          title="ポート削除"
-                        >
-                          <X size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                          {nodeData.status === 'up' && (
+                            <button
+                              type="button"
+                              onClick={() => handleInterfaceStateToggle(iface.name, iface.adminState)}
+                              className={`interface-state-btn ${iface.adminState === 'down' ? 'down' : 'up'}`}
+                              title={iface.adminState === 'down' ? 'リンク有効化 (UP)' : 'リンク無効化 (DOWN)'}
+                            >
+                              {iface.adminState === 'down' ? <Link2Off size={14} /> : <Link size={14} />}
+                            </button>
+                          )}
+                          <button 
+                            type="button" 
+                            onClick={() => deletePort(selectedNode.id, iface.name)}
+                            className="delete-port-btn" 
+                            title="ポート削除"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <label style={{ fontSize: '12px' }}>モード:</label>
@@ -761,6 +876,17 @@ export default function PropertyPanel() {
                           handleInterfaceChange(idx, { ipAddress: ip, netmask: mask });
                         }}
                       />
+                      {nodeData.status === 'up' && (
+                        <button
+                          type="button"
+                          onClick={() => handleInterfaceStateToggle(iface.name, iface.adminState)}
+                          className={`interface-state-btn ${iface.adminState === 'down' ? 'down' : 'up'}`}
+                          title={iface.adminState === 'down' ? 'リンク有効化 (UP)' : 'リンク無効化 (DOWN)'}
+                          style={{ marginRight: '4px' }}
+                        >
+                          {iface.adminState === 'down' ? <Link2Off size={14} /> : <Link size={14} />}
+                        </button>
+                      )}
                       <button 
                         type="button" 
                         onClick={() => deletePort(selectedNode.id, iface.name)}
@@ -802,6 +928,28 @@ export default function PropertyPanel() {
                       onChange={(e) => handleHostFieldChange('gateway', e.target.value)}
                     />
                   </div>
+                  {nodeData.status === 'up' && (
+                    <div className="form-group row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                      <label>インターフェース eth1 状態</label>
+                      <button
+                        type="button"
+                        onClick={() => handleInterfaceStateToggle('eth1', nodeData.eth1AdminState)}
+                        className={`interface-state-btn ${nodeData.eth1AdminState === 'down' ? 'down' : 'up'}`}
+                        title={nodeData.eth1AdminState === 'down' ? 'リンク有効化 (UP)' : 'リンク無効化 (DOWN)'}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '4px', border: '1px solid var(--border-color)', cursor: 'pointer' }}
+                      >
+                        {nodeData.eth1AdminState === 'down' ? (
+                          <>
+                            <Link2Off size={14} /> リンク無効 (DOWN)
+                          </>
+                        ) : (
+                          <>
+                            <Link size={14} /> リンク有効 (UP)
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
 
