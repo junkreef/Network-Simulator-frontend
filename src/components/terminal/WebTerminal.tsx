@@ -9,7 +9,9 @@ import {
   registerStatusListener
 } from './terminalManager';
 import type { SessionRefs } from './terminalManager';
+import 'xterm/css/xterm.css';
 import './WebTerminal.css';
+
 
 interface TerminalActiveViewProps {
   nodeId: string;
