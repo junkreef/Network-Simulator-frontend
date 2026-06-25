@@ -5,6 +5,38 @@ import { getNodeStatus } from '../../api/client';
 import { Trash2, Plus, X, RefreshCw } from 'lucide-react';
 import './PropertyPanel.css';
 
+// エリアIDからコントラストの高い一意のHSLカラーを生成するヘルパー関数（ダークテーマ用）
+// 隣接するエリアID（例: 0.0.0.0 と 0.0.0.1）で色が似てしまわないよう、黄金角（137.5度）を用いて色相を最大分散させます。
+const getAreaColor = (areaId: string): string => {
+  if (!areaId) return 'var(--border-color)';
+  
+  let num = 0;
+  if (areaId.includes('.')) {
+    const parts = areaId.split('.').map(Number);
+    if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+      // 32bit無符号整数に変換
+      num = parts[0] * 16777216 + parts[1] * 65536 + parts[2] * 256 + parts[3];
+    }
+  } else {
+    const parsed = parseInt(areaId, 10);
+    if (!isNaN(parsed)) {
+      num = parsed;
+    } else {
+      // 文字列の簡易ハッシュフォールバック
+      let hash = 0;
+      for (let i = 0; i < areaId.length; i++) {
+        hash = areaId.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      num = Math.abs(hash);
+    }
+  }
+  
+  // 黄金角（約137.5度）を掛けることで、隣り合う数値の色相を円周上で最大限離します
+  const h = Math.round((num * 137.5) % 360);
+  return `hsl(${h}, 75%, 60%)`;
+};
+
+
 export default function PropertyPanel() {
   const {
     nodes,
@@ -908,96 +940,95 @@ export default function PropertyPanel() {
                         </div>
                         
                         <div className="area-list" style={{ marginTop: '10px' }}>
-                          {(nodeData.routing?.ospf?.areas || []).map((area: any) => (
-                            <div key={area.areaId} className="area-card" data-testid={`area-card-${area.areaId}`} style={{
-                              border: '1px solid #ddd',
-                              borderRadius: '4px',
-                              padding: '10px',
-                              marginBottom: '10px',
-                              backgroundColor: '#f9f9f9'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                <strong style={{ fontSize: '14px' }}>エリア: {area.areaId}</strong>
-                                <button type="button" onClick={() => handleRemoveOspfArea(area.areaId)} className="icon-btn-remove" data-testid={`remove-area-${area.areaId}`} style={{ padding: '2px' }}>
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-
-                              <div className="form-group" style={{ marginBottom: '8px' }}>
-                                <label style={{ fontSize: '12px' }}>エリアタイプ</label>
-                                <select
-                                  value={area.areaType || 'normal'}
-                                  onChange={(e) => handleOspfAreaFieldChange(area.areaId, 'areaType', e.target.value)}
-                                  data-testid={`area-type-select-${area.areaId}`}
-                                  style={{ width: '100%', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
-                                >
-                                  <option value="normal">Normal</option>
-                                  <option value="stub">Stub</option>
-                                  <option value="totally-stub">Totally Stubby</option>
-                                  <option value="nssa">NSSA</option>
-                                  <option value="totally-nssa">Totally NSSA</option>
-                                </select>
-                              </div>
-
-                              <div className="form-group" style={{ marginBottom: '8px' }}>
-                                <label style={{ fontSize: '12px' }}>所属インターフェース</label>
-                                <div className="checkbox-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '100px', overflowY: 'auto', padding: '4px', border: '1px solid #eee', borderRadius: '4px', backgroundColor: '#fff' }}>
-                                  {/* 物理インターフェース */}
-                                  {(nodeData.interfaces || []).map((i: any) => (
-                                    <label className="checkbox-label" key={i.id} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={area.interfaces?.includes(i.name) || false}
-                                        onChange={() => handleOspfAreaInterfaceToggle(area.areaId, i.name)}
-                                        data-testid={`area-${area.areaId}-iface-${i.name}`}
-                                      />
-                                      {i.name}
-                                    </label>
-                                  ))}
-                                  {/* VLANインターフェース */}
-                                  {(nodeData.vlanInterfaces || []).map((v: any) => (
-                                    <label className="checkbox-label" key={v.name} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={area.interfaces?.includes(v.name) || false}
-                                        onChange={() => handleOspfAreaInterfaceToggle(area.areaId, v.name)}
-                                        data-testid={`area-${area.areaId}-iface-${v.name}`}
-                                      />
-                                      {v.name}
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="form-group" style={{ marginBottom: '0' }}>
-                                <label style={{ fontSize: '12px' }}>ルート集約 (Area Range)</label>
-                                <div className="vlan-add-form" style={{ display: 'flex', gap: '4px' }}>
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. 10.0.0.0/24"
-                                    value={areaRangeInputs[area.areaId] || ''}
-                                    onChange={(e) => setAreaRangeInputs({ ...areaRangeInputs, [area.areaId]: e.target.value })}
-                                    data-testid={`area-${area.areaId}-range-input`}
-                                    style={{ flex: 1, padding: '4px', fontSize: '12px' }}
-                                  />
-                                  <button type="button" onClick={() => handleAddOspfAreaRange(area.areaId)} className="icon-btn-add" data-testid={`area-${area.areaId}-add-range-btn`} style={{ padding: '4px' }}>
-                                    <Plus size={12} />
+                          {(nodeData.routing?.ospf?.areas || []).map((area: any) => {
+                            const areaColor = getAreaColor(area.areaId);
+                            return (
+                              <div key={area.areaId} className="area-card" data-testid={`area-card-${area.areaId}`} style={{
+                                borderLeft: `4px solid ${areaColor}`
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                  <strong style={{ fontSize: '14px', color: areaColor }}>エリア: {area.areaId}</strong>
+                                  <button type="button" onClick={() => handleRemoveOspfArea(area.areaId)} className="icon-btn-remove" data-testid={`remove-area-${area.areaId}`} style={{ padding: '2px' }}>
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
-                                <div className="network-list" style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                  {(area.ranges || []).map((range: string) => (
-                                    <div key={range} className="vlan-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eee', padding: '2px 6px', borderRadius: '2px', fontSize: '11px' }}>
-                                      <span>{range}</span>
-                                      <button type="button" onClick={() => handleRemoveOspfAreaRange(area.areaId, range)} className="icon-btn-remove" data-testid={`area-${area.areaId}-remove-range-${range}`} style={{ padding: '2px' }}>
-                                        <X size={10} />
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
 
-                            </div>
-                          ))}
+                                <div className="form-group" style={{ marginBottom: '8px' }}>
+                                  <label style={{ fontSize: '12px' }}>エリアタイプ</label>
+                                  <select
+                                    value={area.areaType || 'normal'}
+                                    onChange={(e) => handleOspfAreaFieldChange(area.areaId, 'areaType', e.target.value)}
+                                    data-testid={`area-type-select-${area.areaId}`}
+                                    style={{ width: '100%', padding: '6px' }}
+                                  >
+                                    <option value="normal">Normal</option>
+                                    <option value="stub">Stub</option>
+                                    <option value="totally-stub">Totally Stubby</option>
+                                    <option value="nssa">NSSA</option>
+                                    <option value="totally-nssa">Totally NSSA</option>
+                                  </select>
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: '8px' }}>
+                                  <label style={{ fontSize: '12px' }}>所属インターフェース</label>
+                                  <div className="checkbox-group">
+                                    {/* 物理インターフェース */}
+                                    {(nodeData.interfaces || []).map((i: any) => (
+                                      <label className="checkbox-label" key={i.id} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={area.interfaces?.includes(i.name) || false}
+                                          onChange={() => handleOspfAreaInterfaceToggle(area.areaId, i.name)}
+                                          data-testid={`area-${area.areaId}-iface-${i.name}`}
+                                        />
+                                        {i.name}
+                                      </label>
+                                    ))}
+                                    {/* VLANインターフェース */}
+                                    {(nodeData.vlanInterfaces || []).map((v: any) => (
+                                      <label className="checkbox-label" key={v.name} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={area.interfaces?.includes(v.name) || false}
+                                          onChange={() => handleOspfAreaInterfaceToggle(area.areaId, v.name)}
+                                          data-testid={`area-${area.areaId}-iface-${v.name}`}
+                                        />
+                                        {v.name}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="form-group" style={{ marginBottom: '0' }}>
+                                  <label style={{ fontSize: '12px' }}>ルート集約 (Area Range)</label>
+                                  <div className="vlan-add-form" style={{ display: 'flex', gap: '4px' }}>
+                                    <input
+                                      type="text"
+                                      placeholder="e.g. 10.0.0.0/24"
+                                      value={areaRangeInputs[area.areaId] || ''}
+                                      onChange={(e) => setAreaRangeInputs({ ...areaRangeInputs, [area.areaId]: e.target.value })}
+                                      data-testid={`area-${area.areaId}-range-input`}
+                                      style={{ flex: 1, padding: '6px', fontSize: '12px' }}
+                                    />
+                                    <button type="button" onClick={() => handleAddOspfAreaRange(area.areaId)} className="icon-btn-add" data-testid={`area-${area.areaId}-add-range-btn`} style={{ padding: '4px' }}>
+                                      <Plus size={12} />
+                                    </button>
+                                  </div>
+                                  <div className="network-list" style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    {(area.ranges || []).map((range: string) => (
+                                      <div key={range} className="vlan-row">
+                                        <span>{range}</span>
+                                        <button type="button" onClick={() => handleRemoveOspfAreaRange(area.areaId, range)} className="icon-btn-remove" data-testid={`area-${area.areaId}-remove-range-${range}`} style={{ padding: '2px' }}>
+                                          <X size={10} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
