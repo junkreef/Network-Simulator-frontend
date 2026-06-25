@@ -167,6 +167,26 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await page.click('text=更新');
     await expect(page.locator('.property-panel pre')).toContainText(/10.10.10.0\/24/);
     await expect(page.locator('.property-panel pre')).toContainText(/default via 10.10.10.1/);
+
+    // 7. Verify Config-Only Apply Speed Optimization (Bypass container deploy)
+    await page.click('[data-id="host-1"]', { force: true });
+    await page.click('text=設定');
+    const ipInput = page.locator('#host-ip');
+    await expect(ipInput).toBeVisible();
+    await ipInput.fill('10.10.10.20/24'); // Change IP to trigger config changes
+
+    await page.waitForTimeout(1000);
+
+    const startTime = Date.now();
+    await page.click('[data-testid="apply-btn"]');
+
+    // Wait for success toast. Since it's config-only, it should complete in under 8 seconds.
+    await expect(successToast).toBeVisible({ timeout: 8000 });
+    await expect(successToast).toHaveText(/トポロジを適用しました。/);
+    
+    const duration = Date.now() - startTime;
+    console.log(`E2E Config-only apply duration: ${duration}ms`);
+    expect(duration).toBeLessThan(8000);
   });
 
   test('OSPF動的ルーティングのE2Eテスト', async ({ page }) => {
@@ -760,3 +780,4 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     }
   });
 });
+
