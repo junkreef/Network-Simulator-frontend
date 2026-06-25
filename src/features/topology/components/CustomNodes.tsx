@@ -33,44 +33,60 @@ export const RouterNode = ({ id, data, selected }: NodeProps<RouterNodeData>) =>
       <div className="node-ports-list">
         {(data.interfaces || []).map((iface) => {
           const isConnected = checkIsPortConnected(id, iface.name, edges);
+          const subVlans = (data.vlanInterfaces || []).filter(
+            (vlan) => vlan.parentInterface === iface.name
+          );
+
           return (
-            <div key={iface.name} className="node-port-row" data-connected={isConnected}>
-              {/* 左側のハンドルペア (完全に重ねる) */}
-              <Handle 
-                type="target" 
-                position={Position.Left} 
-                id={`${iface.name}-left-tgt`} 
-                className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
-                isConnectable={!isConnected}
-                isConnectableStart={false}
-              />
-              <Handle 
-                type="source" 
-                position={Position.Left} 
-                id={`${iface.name}-left-src`} 
-                className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
-                isConnectable={!isConnected}
-              />
+            <div key={iface.name} className="node-port-group">
+              {/* 物理ポートの行 */}
+              <div className="node-port-row parent-port" data-connected={isConnected}>
+                {/* 常に物理ポートの行にHandleを配置 */}
+                <Handle 
+                  type="target" 
+                  position={Position.Left} 
+                  id={`${iface.name}-left-tgt`} 
+                  className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
+                  isConnectable={!isConnected}
+                  isConnectableStart={false}
+                />
+                <Handle 
+                  type="source" 
+                  position={Position.Left} 
+                  id={`${iface.name}-left-src`} 
+                  className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
+                  isConnectable={!isConnected}
+                />
 
-              <span className="port-name-label">{iface.name}</span>
-              <span className="port-ip-label">{iface.ipAddress ? `${iface.ipAddress}/${iface.netmask}` : 'no IP'}</span>
+                <span className="port-name-label">{iface.name}</span>
+                <span className="port-ip-label">{iface.ipAddress ? `${iface.ipAddress}/${iface.netmask}` : 'no IP'}</span>
 
-              {/* 右側のハンドルペア (完全に重ねる) */}
-              <Handle 
-                type="target" 
-                position={Position.Right} 
-                id={`${iface.name}-right-tgt`} 
-                className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
-                isConnectable={!isConnected}
-                isConnectableStart={false}
-              />
-              <Handle 
-                type="source" 
-                position={Position.Right} 
-                id={`${iface.name}-right-src`} 
-                className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
-                isConnectable={!isConnected}
-              />
+                <Handle 
+                  type="target" 
+                  position={Position.Right} 
+                  id={`${iface.name}-right-tgt`} 
+                  className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
+                  isConnectable={!isConnected}
+                  isConnectableStart={false}
+                />
+                <Handle 
+                  type="source" 
+                  position={Position.Right} 
+                  id={`${iface.name}-right-src`} 
+                  className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
+                  isConnectable={!isConnected}
+                />
+              </div>
+
+              {/* VLAN サブインターフェイスの行 */}
+              {subVlans.map((vlan) => {
+                return (
+                  <div key={vlan.name} className="node-port-row vlan-port" data-connected={isConnected}>
+                    <span className="port-name-label vlan-subname">.{vlan.vlanId}</span>
+                    <span className="port-ip-label">{vlan.ipAddress || 'no IP'}</span>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -83,6 +99,10 @@ export const HostNode = ({ id, data, selected }: NodeProps<HostNodeData>) => {
   const isUp = data.status === 'up';
   const edges = useTopologyStore(state => state.edges);
   const isConnected = checkIsPortConnected(id, 'eth1', edges);
+
+  const subVlans = (data.vlanInterfaces || []).filter(
+    (vlan) => vlan.parentInterface === 'eth1'
+  );
 
   return (
     <div className={`custom-node host-node ${selected ? 'selected' : ''} ${isUp ? 'up' : 'down'}`}>
@@ -98,43 +118,55 @@ export const HostNode = ({ id, data, selected }: NodeProps<HostNodeData>) => {
       </div>
       
       <div className="node-ports-list">
-        <div className="node-port-row" data-connected={isConnected}>
-          {/* 左側のハンドルペア (完全に重ねる) */}
-          <Handle 
-            type="target" 
-            position={Position.Left} 
-            id="eth1-left-tgt" 
-            className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
-            isConnectable={!isConnected}
-            isConnectableStart={false}
-          />
-          <Handle 
-            type="source" 
-            position={Position.Left} 
-            id="eth1-left-src" 
-            className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
-            isConnectable={!isConnected}
-          />
+        <div className="node-port-group">
+          {/* 物理ポートの行 */}
+          <div className="node-port-row parent-port" data-connected={isConnected}>
+            {/* 常に物理ポートの行にHandleを配置 */}
+            <Handle 
+              type="target" 
+              position={Position.Left} 
+              id="eth1-left-tgt" 
+              className={`node-handle target-handle left ${isConnected ? 'connected' : ''}`}
+              isConnectable={!isConnected}
+              isConnectableStart={false}
+            />
+            <Handle 
+              type="source" 
+              position={Position.Left} 
+              id="eth1-left-src" 
+              className={`node-handle source-handle left ${isConnected ? 'connected' : ''}`}
+              isConnectable={!isConnected}
+            />
 
-          <span className="port-name-label">eth1</span>
-          <span className="port-ip-label">{data.ipAddress || 'no IP'}</span>
+            <span className="port-name-label">eth1</span>
+            <span className="port-ip-label">{data.ipAddress || 'no IP'}</span>
 
-          {/* 右側のハンドルペア (完全に重ねる) */}
-          <Handle 
-            type="target" 
-            position={Position.Right} 
-            id="eth1-right-tgt" 
-            className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
-            isConnectable={!isConnected}
-            isConnectableStart={false}
-          />
-          <Handle 
-            type="source" 
-            position={Position.Right} 
-            id="eth1-right-src" 
-            className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
-            isConnectable={!isConnected}
-          />
+            <Handle 
+              type="target" 
+              position={Position.Right} 
+              id="eth1-right-tgt" 
+              className={`node-handle target-handle right ${isConnected ? 'connected' : ''}`}
+              isConnectable={!isConnected}
+              isConnectableStart={false}
+            />
+            <Handle 
+              type="source" 
+              position={Position.Right} 
+              id="eth1-right-src" 
+              className={`node-handle source-handle right ${isConnected ? 'connected' : ''}`}
+              isConnectable={!isConnected}
+            />
+          </div>
+
+          {/* VLAN サブインターフェイスの行 */}
+          {subVlans.map((vlan) => {
+            return (
+              <div key={vlan.name} className="node-port-row vlan-port" data-connected={isConnected}>
+                <span className="port-name-label vlan-subname">.{vlan.vlanId}</span>
+                <span className="port-ip-label">{vlan.ipAddress || 'no IP'}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

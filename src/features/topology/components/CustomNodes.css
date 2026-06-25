@@ -238,3 +238,19 @@
   box-shadow: 0 0 6px var(--color-info);
 }
 
+/* VLAN Port Node Style */
+.vlan-port {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.vlan-port:not(:first-child) {
+  border-top: 1px dashed rgba(255, 255, 255, 0.05) !important;
+}
+
+.vlan-subname {
+  padding-left: 8px;
+  opacity: 0.8;
+  font-weight: normal !important;
+}
+
+
