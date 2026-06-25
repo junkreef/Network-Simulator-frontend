@@ -195,10 +195,18 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
                   ospf: {
                     enabled: true,
                     routerId: '1.1.1.1',
-                    areaId: '0.0.0.0',
-                    interfaces: ['eth2']
+                    areas: [
+                      {
+                        areaId: '0.0.0.0',
+                        interfaces: ['eth2'],
+                        ranges: [],
+                        areaType: 'normal'
+                      }
+                    ],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
                   },
-                  rip: { enabled: false, networks: [], interfaces: [] },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
                   bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] }
                 }
               }
@@ -216,10 +224,18 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
                   ospf: {
                     enabled: true,
                     routerId: '2.2.2.2',
-                    areaId: '0.0.0.0',
-                    interfaces: ['eth2']
+                    areas: [
+                      {
+                        areaId: '0.0.0.0',
+                        interfaces: ['eth2'],
+                        ranges: [],
+                        areaType: 'normal'
+                      }
+                    ],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
                   },
-                  rip: { enabled: false, networks: [], interfaces: [] },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
                   bgp: { enabled: false, asNumber: 65002, routerId: '', neighbors: [] }
                 }
               }
@@ -288,8 +304,14 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
                   { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.1', netmask: '24', connectedTo: 'router-2' }
                 ],
                 routing: {
-                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
-                  rip: { enabled: false, networks: [], interfaces: [] },
+                  ospf: {
+                    enabled: false,
+                    routerId: '',
+                    areas: [],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
+                  },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
                   bgp: {
                     enabled: true,
                     asNumber: 65001,
@@ -309,8 +331,14 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
                   { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.2', netmask: '24', connectedTo: 'router-1' }
                 ],
                 routing: {
-                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
-                  rip: { enabled: false, networks: [], interfaces: [] },
+                  ospf: {
+                    enabled: false,
+                    routerId: '',
+                    areas: [],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
+                  },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
                   bgp: {
                     enabled: true,
                     asNumber: 65002,
@@ -383,8 +411,14 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
                   { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.1', netmask: '24', connectedTo: 'router-2' }
                 ],
                 routing: {
-                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
-                  rip: { enabled: false, networks: [], interfaces: [] },
+                  ospf: {
+                    enabled: false,
+                    routerId: '',
+                    areas: [],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
+                  },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
                   bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] }
                 },
                 staticRoutes: [
@@ -402,8 +436,14 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
                   { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.2', netmask: '24', connectedTo: 'router-1' }
                 ],
                 routing: {
-                  ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
-                  rip: { enabled: false, networks: [], interfaces: [] },
+                  ospf: {
+                    enabled: false,
+                    routerId: '',
+                    areas: [],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
+                  },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
                   bgp: { enabled: false, asNumber: 65002, routerId: '', neighbors: [] }
                 },
                 staticRoutes: [
@@ -551,8 +591,14 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
           ],
           vlanInterfaces: [],
           routing: {
-            ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
-            rip: { enabled: false, networks: [], interfaces: [] },
+            ospf: {
+              enabled: false,
+              routerId: '',
+              areas: [],
+              redistribute: { connected: false, static: false, rip: false, bgp: false },
+              defaultInformationOriginate: { enabled: false, always: false }
+            },
+            rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
             bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] },
           },
           staticRoutes: []

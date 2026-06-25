@@ -111,18 +111,24 @@ export default function Header() {
 
         if (node.type === 'router') {
           const data = node.data;
-          const ospfInterfaces = data.routing?.ospf?.interfaces || [];
-          const ospfNetworks: string[] = [];
-          
-          (data.interfaces || []).forEach((i: any) => {
-            if (ospfInterfaces.includes(i.name) && i.ipAddress && i.netmask) {
-              ospfNetworks.push(`${i.ipAddress}/${i.netmask}`);
-            }
-          });
-          (data.vlanInterfaces || []).forEach((v: any) => {
-            if (ospfInterfaces.includes(v.name) && v.ipAddress) {
-              ospfNetworks.push(v.ipAddress);
-            }
+          const areas = (data.routing?.ospf?.areas || []).map((area: any) => {
+            const areaNetworks: string[] = [];
+            (area.interfaces || []).forEach((ifaceName: string) => {
+              const foundIface = (data.interfaces || []).find((i: any) => i.name === ifaceName);
+              if (foundIface && foundIface.ipAddress && foundIface.netmask) {
+                areaNetworks.push(`${foundIface.ipAddress}/${foundIface.netmask}`);
+              }
+              const foundVlanIface = (data.vlanInterfaces || []).find((v: any) => v.name === ifaceName);
+              if (foundVlanIface && foundVlanIface.ipAddress) {
+                areaNetworks.push(foundVlanIface.ipAddress);
+              }
+            });
+            return {
+              area_id: area.areaId || '0.0.0.0',
+              networks: areaNetworks,
+              ranges: area.ranges || [],
+              area_type: area.areaType || 'normal'
+            };
           });
 
           configPayload = {
@@ -142,16 +148,14 @@ export default function Header() {
               ospf: {
                 enabled: data.routing?.ospf?.enabled || false,
                 router_id: data.routing?.ospf?.routerId || '',
-                areas: [
-                  {
-                    area_id: data.routing?.ospf?.areaId || '0.0.0.0',
-                    networks: ospfNetworks,
-                  }
-                ]
+                areas: areas,
+                redistribute: data.routing?.ospf?.redistribute || {},
+                default_information_originate: data.routing?.ospf?.defaultInformationOriginate || { enabled: false }
               },
               rip: {
                 enabled: data.routing?.rip?.enabled || false,
                 networks: data.routing?.rip?.networks || [],
+                redistribute: data.routing?.rip?.redistribute || {},
               },
               bgp: {
                 enabled: data.routing?.bgp?.enabled || false,
@@ -161,6 +165,7 @@ export default function Header() {
                   ip_address: n.ipAddress,
                   remote_as: Number(n.remoteAs),
                 })),
+                redistribute: data.routing?.bgp?.redistribute || {},
               }
             },
             static_routes: (data.staticRoutes || []).map((r: any) => ({

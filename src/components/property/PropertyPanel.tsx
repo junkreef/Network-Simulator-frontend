@@ -29,6 +29,10 @@ export default function PropertyPanel() {
   const [vlanIdInput, setVlanIdInput] = useState<string>('');
   const [vlanIpInput, setVlanIpInput] = useState<string>('');
 
+  // OSPFエリア追加用 / レンジ追加用ローカルステート
+  const [newAreaIdInput, setNewAreaIdInput] = useState<string>('');
+  const [areaRangeInputs, setAreaRangeInputs] = useState<Record<string, string>>({});
+
   // RIPネットワーク追加用
   const [ripNetworkInput, setRipNetworkInput] = useState<string>('');
 
@@ -257,8 +261,11 @@ export default function PropertyPanel() {
     updated[index] = newVlan;
 
     const newRouting = { ...nodeData.routing };
-    if (newRouting.ospf?.interfaces?.includes(oldName)) {
-      newRouting.ospf.interfaces = newRouting.ospf.interfaces.map((i: string) => i === oldName ? newVlan.name : i);
+    if (newRouting.ospf?.areas) {
+      newRouting.ospf.areas = newRouting.ospf.areas.map((area: any) => ({
+        ...area,
+        interfaces: (area.interfaces || []).map((i: string) => i === oldName ? newVlan.name : i)
+      }));
     }
     if (newRouting.rip?.interfaces?.includes(oldName)) {
       newRouting.rip.interfaces = newRouting.rip.interfaces.map((i: string) => i === oldName ? newVlan.name : i);
@@ -272,7 +279,13 @@ export default function PropertyPanel() {
 
   // OSPF
   const handleOspfToggle = () => {
-    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] };
+    const ospf = nodeData.routing?.ospf || {
+      enabled: false,
+      routerId: '',
+      areas: [],
+      redistribute: { connected: false, static: false, rip: false, bgp: false },
+      defaultInformationOriginate: { enabled: false, always: false }
+    };
     updateNodeData(selectedNode.id, {
       routing: {
         ...nodeData.routing,
@@ -282,7 +295,13 @@ export default function PropertyPanel() {
   };
 
   const handleOspfFieldChange = (field: string, value: any) => {
-    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] };
+    const ospf = nodeData.routing?.ospf || {
+      enabled: false,
+      routerId: '',
+      areas: [],
+      redistribute: { connected: false, static: false, rip: false, bgp: false },
+      defaultInformationOriginate: { enabled: false, always: false }
+    };
     updateNodeData(selectedNode.id, {
       routing: {
         ...nodeData.routing,
@@ -291,13 +310,149 @@ export default function PropertyPanel() {
     });
   };
 
-  const handleOspfInterfaceToggle = (ifName: string) => {
-    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] };
-    const interfaces = ospf.interfaces || [];
-    const updated = interfaces.includes(ifName)
+  const handleAddOspfArea = () => {
+    if (!newAreaIdInput) return;
+    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areas: [] };
+    const areas = ospf.areas || [];
+    if (!areas.some((a: any) => a.areaId === newAreaIdInput)) {
+      const newArea = {
+        areaId: newAreaIdInput,
+        interfaces: [],
+        ranges: [],
+        areaType: 'normal'
+      };
+      handleOspfFieldChange('areas', [...areas, newArea]);
+    }
+    setNewAreaIdInput('');
+  };
+
+  const handleRemoveOspfArea = (areaId: string) => {
+    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areas: [] };
+    const areas = ospf.areas || [];
+    handleOspfFieldChange('areas', areas.filter((a: any) => a.areaId !== areaId));
+  };
+
+  const handleOspfAreaFieldChange = (areaId: string, field: string, value: any) => {
+    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areas: [] };
+    const areas = ospf.areas || [];
+    const updated = areas.map((a: any) => {
+      if (a.areaId === areaId) {
+        return { ...a, [field]: value };
+      }
+      return a;
+    });
+    handleOspfFieldChange('areas', updated);
+  };
+
+  const handleOspfAreaInterfaceToggle = (areaId: string, ifName: string) => {
+    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areas: [] };
+    const areas = ospf.areas || [];
+    const area = areas.find((a: any) => a.areaId === areaId);
+    if (!area) return;
+    const interfaces = area.interfaces || [];
+    const updatedInterfaces = interfaces.includes(ifName)
       ? interfaces.filter((i: string) => i !== ifName)
       : [...interfaces, ifName];
-    handleOspfFieldChange('interfaces', updated);
+    
+    // Remove interface from other areas to prevent duplicate assignment
+    const updatedAreas = areas.map((a: any) => {
+      if (a.areaId === areaId) {
+        return { ...a, interfaces: updatedInterfaces };
+      }
+      return {
+        ...a,
+        interfaces: (a.interfaces || []).filter((i: string) => i !== ifName)
+      };
+    });
+    handleOspfFieldChange('areas', updatedAreas);
+  };
+
+  const handleAddOspfAreaRange = (areaId: string) => {
+    const val = areaRangeInputs[areaId] || '';
+    if (!val) return;
+    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areas: [] };
+    const areas = ospf.areas || [];
+    const area = areas.find((a: any) => a.areaId === areaId);
+    if (!area) return;
+    const ranges = area.ranges || [];
+    if (!ranges.includes(val)) {
+      const updatedAreas = areas.map((a: any) => {
+        if (a.areaId === areaId) {
+          return { ...a, ranges: [...ranges, val] };
+        }
+        return a;
+      });
+      handleOspfFieldChange('areas', updatedAreas);
+    }
+    setAreaRangeInputs({ ...areaRangeInputs, [areaId]: '' });
+  };
+
+  const handleRemoveOspfAreaRange = (areaId: string, range: string) => {
+    const ospf = nodeData.routing?.ospf || { enabled: false, routerId: '', areas: [] };
+    const areas = ospf.areas || [];
+    const area = areas.find((a: any) => a.areaId === areaId);
+    if (!area) return;
+    const ranges = area.ranges || [];
+    const updatedAreas = areas.map((a: any) => {
+      if (a.areaId === areaId) {
+        return { ...a, ranges: ranges.filter((r: string) => r !== range) };
+      }
+      return a;
+    });
+    handleOspfFieldChange('areas', updatedAreas);
+  };
+
+  const handleOspfDefaultRouteToggle = () => {
+    const ospf = nodeData.routing?.ospf || {};
+    const dio = ospf.defaultInformationOriginate || { enabled: false, always: false };
+    updateNodeData(selectedNode.id, {
+      routing: {
+        ...nodeData.routing,
+        ospf: {
+          ...ospf,
+          defaultInformationOriginate: {
+            ...dio,
+            enabled: !dio.enabled
+          }
+        }
+      }
+    });
+  };
+
+  const handleOspfDefaultRouteAlwaysToggle = () => {
+    const ospf = nodeData.routing?.ospf || {};
+    const dio = ospf.defaultInformationOriginate || { enabled: false, always: false };
+    updateNodeData(selectedNode.id, {
+      routing: {
+        ...nodeData.routing,
+        ospf: {
+          ...ospf,
+          defaultInformationOriginate: {
+            ...dio,
+            always: !dio.always
+          }
+        }
+      }
+    });
+  };
+
+  // Redistribution Checkbox Toggler
+  const handleRedistributeToggle = (protocol: 'ospf' | 'rip' | 'bgp', source: string) => {
+    const protoConfig = nodeData.routing?.[protocol] || {};
+    const redistribute = protoConfig.redistribute || {};
+    const updatedRedistribute = {
+      ...redistribute,
+      [source]: !redistribute[source]
+    };
+    updateNodeData(selectedNode.id, {
+      routing: {
+        ...nodeData.routing,
+        [protocol]: {
+          ...protoConfig,
+          redistribute: updatedRedistribute
+        }
+      }
+    });
   };
 
   // RIP
@@ -736,43 +891,186 @@ export default function PropertyPanel() {
                           onChange={(e) => handleOspfFieldChange('routerId', e.target.value)}
                         />
                       </div>
-                      <div className="form-group">
-                        <label htmlFor="ospf-area-id">エリアID</label>
-                        <input
-                          id="ospf-area-id"
-                          type="text"
-                          placeholder="e.g. 0.0.0.0"
-                          value={nodeData.routing?.ospf?.areaId || ''}
-                          onChange={(e) => handleOspfFieldChange('areaId', e.target.value)}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>対象インターフェース</label>
-                        <div className="checkbox-group">
-                          {/* 物理インターフェース */}
-                          {(nodeData.interfaces || []).map((i: any) => (
-                            <label className="checkbox-label" key={i.id}>
-                              <input
-                                type="checkbox"
-                                checked={nodeData.routing?.ospf?.interfaces?.includes(i.name) || false}
-                                onChange={() => handleOspfInterfaceToggle(i.name)}
-                              />
-                              {i.name}
-                            </label>
-                          ))}
-                          {/* VLANインターフェース */}
-                          {(nodeData.vlanInterfaces || []).map((v: any) => (
-                            <label className="checkbox-label" key={v.name}>
-                              <input
-                                type="checkbox"
-                                checked={nodeData.routing?.ospf?.interfaces?.includes(v.name) || false}
-                                onChange={() => handleOspfInterfaceToggle(v.name)}
-                              />
-                              {v.name}
-                            </label>
+
+                      {/* エリア管理セクション */}
+                      <div className="vlan-section">
+                        <h5>エリア設定 (ABR)</h5>
+                        <div className="vlan-add-form">
+                          <input
+                            type="text"
+                            placeholder="エリアID (e.g. 0.0.0.0)"
+                            value={newAreaIdInput}
+                            onChange={(e) => setNewAreaIdInput(e.target.value)}
+                          />
+                          <button type="button" onClick={handleAddOspfArea} className="icon-btn-add" data-testid="add-area-btn">
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                        
+                        <div className="area-list" style={{ marginTop: '10px' }}>
+                          {(nodeData.routing?.ospf?.areas || []).map((area: any) => (
+                            <div key={area.areaId} className="area-card" data-testid={`area-card-${area.areaId}`} style={{
+                              border: '1px solid #ddd',
+                              borderRadius: '4px',
+                              padding: '10px',
+                              marginBottom: '10px',
+                              backgroundColor: '#f9f9f9'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <strong style={{ fontSize: '14px' }}>エリア: {area.areaId}</strong>
+                                <button type="button" onClick={() => handleRemoveOspfArea(area.areaId)} className="icon-btn-remove" data-testid={`remove-area-${area.areaId}`} style={{ padding: '2px' }}>
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+
+                              <div className="form-group" style={{ marginBottom: '8px' }}>
+                                <label style={{ fontSize: '12px' }}>エリアタイプ</label>
+                                <select
+                                  value={area.areaType || 'normal'}
+                                  onChange={(e) => handleOspfAreaFieldChange(area.areaId, 'areaType', e.target.value)}
+                                  data-testid={`area-type-select-${area.areaId}`}
+                                  style={{ width: '100%', padding: '4px', borderRadius: '4px', border: '1px solid #ccc' }}
+                                >
+                                  <option value="normal">Normal</option>
+                                  <option value="stub">Stub</option>
+                                  <option value="totally-stub">Totally Stubby</option>
+                                  <option value="nssa">NSSA</option>
+                                  <option value="totally-nssa">Totally NSSA</option>
+                                </select>
+                              </div>
+
+                              <div className="form-group" style={{ marginBottom: '8px' }}>
+                                <label style={{ fontSize: '12px' }}>所属インターフェース</label>
+                                <div className="checkbox-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '100px', overflowY: 'auto', padding: '4px', border: '1px solid #eee', borderRadius: '4px', backgroundColor: '#fff' }}>
+                                  {/* 物理インターフェース */}
+                                  {(nodeData.interfaces || []).map((i: any) => (
+                                    <label className="checkbox-label" key={i.id} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={area.interfaces?.includes(i.name) || false}
+                                        onChange={() => handleOspfAreaInterfaceToggle(area.areaId, i.name)}
+                                        data-testid={`area-${area.areaId}-iface-${i.name}`}
+                                      />
+                                      {i.name}
+                                    </label>
+                                  ))}
+                                  {/* VLANインターフェース */}
+                                  {(nodeData.vlanInterfaces || []).map((v: any) => (
+                                    <label className="checkbox-label" key={v.name} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={area.interfaces?.includes(v.name) || false}
+                                        onChange={() => handleOspfAreaInterfaceToggle(area.areaId, v.name)}
+                                        data-testid={`area-${area.areaId}-iface-${v.name}`}
+                                      />
+                                      {v.name}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="form-group" style={{ marginBottom: '0' }}>
+                                <label style={{ fontSize: '12px' }}>ルート集約 (Area Range)</label>
+                                <div className="vlan-add-form" style={{ display: 'flex', gap: '4px' }}>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. 10.0.0.0/24"
+                                    value={areaRangeInputs[area.areaId] || ''}
+                                    onChange={(e) => setAreaRangeInputs({ ...areaRangeInputs, [area.areaId]: e.target.value })}
+                                    data-testid={`area-${area.areaId}-range-input`}
+                                    style={{ flex: 1, padding: '4px', fontSize: '12px' }}
+                                  />
+                                  <button type="button" onClick={() => handleAddOspfAreaRange(area.areaId)} className="icon-btn-add" data-testid={`area-${area.areaId}-add-range-btn`} style={{ padding: '4px' }}>
+                                    <Plus size={12} />
+                                  </button>
+                                </div>
+                                <div className="network-list" style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  {(area.ranges || []).map((range: string) => (
+                                    <div key={range} className="vlan-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eee', padding: '2px 6px', borderRadius: '2px', fontSize: '11px' }}>
+                                      <span>{range}</span>
+                                      <button type="button" onClick={() => handleRemoveOspfAreaRange(area.areaId, range)} className="icon-btn-remove" data-testid={`area-${area.areaId}-remove-range-${range}`} style={{ padding: '2px' }}>
+                                        <X size={10} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                            </div>
                           ))}
                         </div>
                       </div>
+
+                      {/* OSPF デフォルトルート広告 */}
+                      <div className="vlan-section" style={{ marginTop: '12px' }}>
+                        <h5>デフォルトルート広告</h5>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '6px 0' }}>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.ospf?.defaultInformationOriginate?.enabled || false}
+                              onChange={handleOspfDefaultRouteToggle}
+                              data-testid="ospf-default-route-enable"
+                            />
+                            デフォルトルートを広報する
+                          </label>
+                          {nodeData.routing?.ospf?.defaultInformationOriginate?.enabled && (
+                            <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '16px' }}>
+                              <input
+                                type="checkbox"
+                                checked={nodeData.routing?.ospf?.defaultInformationOriginate?.always || false}
+                                onChange={handleOspfDefaultRouteAlwaysToggle}
+                                data-testid="ospf-default-route-always"
+                              />
+                              常に広報する (always)
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 再配送設定 */}
+                      <div className="vlan-section" style={{ marginTop: '12px' }}>
+                        <h5>OSPF ルート再配送設定</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', padding: '6px 0' }}>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.ospf?.redistribute?.connected || false}
+                              onChange={() => handleRedistributeToggle('ospf', 'connected')}
+                              data-testid="ospf-redistribute-connected"
+                            />
+                            直結ルート (Connected)
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.ospf?.redistribute?.static || false}
+                              onChange={() => handleRedistributeToggle('ospf', 'static')}
+                              data-testid="ospf-redistribute-static"
+                            />
+                            静的ルート (Static)
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.ospf?.redistribute?.rip || false}
+                              onChange={() => handleRedistributeToggle('ospf', 'rip')}
+                              data-testid="ospf-redistribute-rip"
+                            />
+                            RIP
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.ospf?.redistribute?.bgp || false}
+                              onChange={() => handleRedistributeToggle('ospf', 'bgp')}
+                              data-testid="ospf-redistribute-bgp"
+                            />
+                            BGP
+                          </label>
+                        </div>
+                      </div>
+
                     </div>
                   )}
                 </section>
@@ -816,6 +1114,50 @@ export default function PropertyPanel() {
                           </div>
                         ))}
                       </div>
+
+                      {/* 再配送設定 */}
+                      <div className="vlan-section" style={{ marginTop: '12px' }}>
+                        <h5>RIP ルート再配送設定</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', padding: '6px 0' }}>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.rip?.redistribute?.connected || false}
+                              onChange={() => handleRedistributeToggle('rip', 'connected')}
+                              data-testid="rip-redistribute-connected"
+                            />
+                            直結ルート (Connected)
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.rip?.redistribute?.static || false}
+                              onChange={() => handleRedistributeToggle('rip', 'static')}
+                              data-testid="rip-redistribute-static"
+                            />
+                            静的ルート (Static)
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.rip?.redistribute?.ospf || false}
+                              onChange={() => handleRedistributeToggle('rip', 'ospf')}
+                              data-testid="rip-redistribute-ospf"
+                            />
+                            OSPF
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.rip?.redistribute?.bgp || false}
+                              onChange={() => handleRedistributeToggle('rip', 'bgp')}
+                              data-testid="rip-redistribute-bgp"
+                            />
+                            BGP
+                          </label>
+                        </div>
+                      </div>
+
                     </div>
                   )}
                 </section>
@@ -886,6 +1228,50 @@ export default function PropertyPanel() {
                           ))}
                         </div>
                       </div>
+
+                      {/* 再配送設定 */}
+                      <div className="vlan-section" style={{ marginTop: '12px' }}>
+                        <h5>BGP ルート再配送設定</h5>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', padding: '6px 0' }}>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.bgp?.redistribute?.connected || false}
+                              onChange={() => handleRedistributeToggle('bgp', 'connected')}
+                              data-testid="bgp-redistribute-connected"
+                            />
+                            直結ルート (Connected)
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.bgp?.redistribute?.static || false}
+                              onChange={() => handleRedistributeToggle('bgp', 'static')}
+                              data-testid="bgp-redistribute-static"
+                            />
+                            静的ルート (Static)
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.bgp?.redistribute?.ospf || false}
+                              onChange={() => handleRedistributeToggle('bgp', 'ospf')}
+                              data-testid="bgp-redistribute-ospf"
+                            />
+                            OSPF
+                          </label>
+                          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input
+                              type="checkbox"
+                              checked={nodeData.routing?.bgp?.redistribute?.rip || false}
+                              onChange={() => handleRedistributeToggle('bgp', 'rip')}
+                              data-testid="bgp-redistribute-rip"
+                            />
+                            RIP
+                          </label>
+                        </div>
+                      </div>
+
                     </div>
                   )}
                 </section>

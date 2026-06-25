@@ -13,17 +13,38 @@ export interface VlanInterfaceData {
   ipAddress: string; // CIDR format (e.g. 10.10.10.1/24)
 }
 
+export interface OspfAreaConfig {
+  areaId: string;
+  interfaces: string[]; // このエリアに所属させるインターフェース
+  ranges?: string[];     // ルート集約設定 (例: ["10.0.0.0/24"])
+  areaType?: 'normal' | 'stub' | 'totally-stub' | 'nssa' | 'totally-nssa';
+}
+
+export interface RedistributionConfig {
+  connected?: boolean; // 直結ルート
+  static?: boolean;    // 静的ルート
+  ospf?: boolean;      // OSPFから学習したルート
+  rip?: boolean;       // RIPから学習したルート
+  bgp?: boolean;       // BGPから学習したルート
+}
+
 export interface OspfConfig {
   enabled: boolean;
   routerId: string;
-  areaId: string;
-  interfaces: string[]; // Active interface names
+  areas: OspfAreaConfig[];
+  redistribute?: RedistributionConfig; // OSPFへの再配送設定
+  defaultInformationOriginate?: {
+    enabled: boolean;
+    always?: boolean;
+    metric?: number;
+  };
 }
 
 export interface RipConfig {
   enabled: boolean;
   networks: string[]; // Network CIDRs
-  interfaces: string[]; // Active interface names
+  interfaces?: string[]; // Active interface names
+  redistribute?: RedistributionConfig; // RIPへの再配送設定
 }
 
 export interface BgpNeighbor {
@@ -36,6 +57,7 @@ export interface BgpConfig {
   asNumber: number;
   routerId: string;
   neighbors: BgpNeighbor[];
+  redistribute?: RedistributionConfig; // BGPへの再配送設定
 }
 
 export interface StaticRoute {

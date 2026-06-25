@@ -55,9 +55,25 @@ const initialRouterData = (label: string): RouterNodeData => ({
   ],
   vlanInterfaces: [],
   routing: {
-    ospf: { enabled: false, routerId: '', areaId: '0.0.0.0', interfaces: [] },
-    rip: { enabled: false, networks: [], interfaces: [] },
-    bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [] },
+    ospf: {
+      enabled: false,
+      routerId: '',
+      areas: [],
+      redistribute: { connected: false, static: false, rip: false, bgp: false },
+      defaultInformationOriginate: { enabled: false, always: false }
+    },
+    rip: {
+      enabled: false,
+      networks: [],
+      redistribute: { connected: false, static: false, ospf: false, bgp: false },
+    },
+    bgp: {
+      enabled: false,
+      asNumber: 65001,
+      routerId: '',
+      neighbors: [],
+      redistribute: { connected: false, static: false, ospf: false, rip: false },
+    },
   },
   staticRoutes: [],
 });
