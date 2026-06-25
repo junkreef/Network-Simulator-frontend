@@ -22,3 +22,18 @@ if (global.SVGElement && !global.SVGElement.prototype.getBBox) {
 // Mock window.HTMLCanvasElement.prototype.getContext
 // Since jsdom doesn't support canvas out of the box and ReactFlow uses it
 HTMLCanvasElement.prototype.getContext = () => null as any;
+
+// Mock matchMedia for Xterm.js ScreenDprMonitor
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});

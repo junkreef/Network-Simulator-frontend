@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -10,6 +10,7 @@ import 'reactflow/dist/style.css';
 import { useTopologyStore } from '../../store/topologyStore';
 import { RouterNode, HostNode, SwitchNode } from './components/CustomNodes';
 import NetworkEdge from './components/NetworkEdge';
+import NodeContextMenu from './components/NodeContextMenu';
 import './Canvas.css';
 
 export default function Canvas() {
@@ -24,6 +25,12 @@ export default function Canvas() {
     addNode,
   } = useTopologyStore();
 
+  const [contextMenu, setContextMenu] = useState<{
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
   const nodeTypes = useMemo<NodeTypes>(() => ({
     router: RouterNode,
     host: HostNode,
@@ -33,6 +40,21 @@ export default function Canvas() {
   const edgeTypes = useMemo<EdgeTypes>(() => ({
     networkEdge: NetworkEdge,
   }), []);
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: any) => {
+      event.preventDefault();
+      const pane = document.querySelector('.react-flow')?.getBoundingClientRect();
+      if (pane) {
+        setContextMenu({
+          id: node.id,
+          x: event.clientX - pane.left,
+          y: event.clientY - pane.top,
+        });
+      }
+    },
+    [setContextMenu]
+  );
 
   return (
     <div className="canvas-container" data-testid="canvas-container">
@@ -44,11 +66,19 @@ export default function Canvas() {
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodeClick={(_, node) => selectNode(node.id)}
-        onEdgeClick={(_, edge) => selectEdge(edge.id)}
+        onNodeClick={(_, node) => {
+          selectNode(node.id);
+          setContextMenu(null);
+        }}
+        onEdgeClick={(_, edge) => {
+          selectEdge(edge.id);
+          setContextMenu(null);
+        }}
+        onNodeContextMenu={onNodeContextMenu}
         onPaneClick={() => {
           selectNode(null);
           selectEdge(null);
+          setContextMenu(null);
         }}
         fitView
         fitViewOptions={{ padding: 0.3 }}
@@ -65,6 +95,15 @@ export default function Canvas() {
           maskColor="rgba(11, 15, 25, 0.7)"
         />
       </ReactFlow>
+
+      {contextMenu && (
+        <NodeContextMenu
+          id={contextMenu.id}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClickOutside={() => setContextMenu(null)}
+        />
+      )}
 
       {/* ノード追加用のフローティングパレット */}
       <div className="canvas-toolbar">

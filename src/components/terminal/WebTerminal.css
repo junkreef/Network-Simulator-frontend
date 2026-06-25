@@ -128,3 +128,88 @@
   background: var(--bg-tertiary);
   border-radius: var(--border-radius-sm);
 }
+
+/* ターミナルタブバー */
+.terminal-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.terminal-tabs::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+
+.terminal-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  padding: 6px 12px;
+  border-top-left-radius: var(--border-radius-sm);
+  border-top-right-radius: var(--border-radius-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  height: 28px;
+  box-sizing: border-box;
+}
+
+.terminal-tab-item:hover {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.terminal-tab-item.active {
+  background-color: #0b0f19; /* ターミナルの背景色と同じにする */
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  border-bottom: 1px solid #0b0f19;
+  font-weight: 600;
+  height: 29px; /* 下のボーダーを覆うように1px高くする */
+  z-index: 1;
+}
+
+.tab-icon {
+  opacity: 0.7;
+}
+
+.tab-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.tab-close-btn:hover {
+  background-color: var(--bg-secondary);
+  color: var(--color-danger);
+}
+
+.terminal-placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.terminal-view-wrapper {
+  width: 100%;
+  height: 100%;
+}

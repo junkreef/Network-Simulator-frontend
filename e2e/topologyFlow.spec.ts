@@ -50,24 +50,31 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
   });
 
   test('トポロジの作成から適用、VLAN経由のPing疎通確認までの一連のフロー', async ({ page }) => {
+    console.log('E2E DEBUG: Test started');
     // 1. Visit Web UI
     const responsePromise = page.waitForResponse((resp: any) => 
       resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
     );
+    console.log('E2E DEBUG: Navigating to /');
     await page.goto('/');
+    console.log('E2E DEBUG: Waiting for /api/v1/topology/state response');
     await responsePromise;
+    console.log('E2E DEBUG: Page loaded successfully');
     await page.waitForTimeout(1000);
     await expect(page).toHaveTitle(/frontend/);
 
+    console.log('E2E DEBUG: Locating edge-1');
     // Delete pre-existing edge-1 to reconstruct topology cleanly
     const edgePath = page.locator('#edge-1').first();
     await expect(edgePath).toBeVisible();
+    console.log('E2E DEBUG: edge-1 visible, clicking...');
     await edgePath.click({ force: true });
 
     const deleteEdgeBtn = page.locator('button[title="リンク削除"]').first();
     await expect(deleteEdgeBtn).toBeVisible();
     await deleteEdgeBtn.click();
     await expect(edgePath).not.toBeVisible();
+    console.log('E2E DEBUG: edge-1 deleted');
 
     // 2. Add Switch-A node (Router-A and Host-A are pre-configured in state)
     const addSwitchBtn = page.locator('[data-testid="add-switch-btn"]').first();
@@ -131,14 +138,28 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await expect(vlanRow.locator('input[type="text"]')).toHaveValue('10.10.10.1/24');
 
     // 5. Deploy / Apply topology config to backend
+    console.log('E2E DEBUG: Clicking apply-btn...');
     await page.click('[data-testid="apply-btn"]');
+    console.log('E2E DEBUG: apply-btn clicked, waiting for success toast...');
     
     // Wait for the success toast (up to 90 seconds to let containerlab deploy finish)
     const successToast = page.locator('.toast-notification.success');
     await expect(successToast).toBeVisible({ timeout: 90000 });
     await expect(successToast).toHaveText(/トポロジを適用しました。/);
+    console.log('E2E DEBUG: Deploy success toast visible');
 
     // 6. Connectivity test & Status update checks
+    // 右クリックでコンテキストメニューを表示し、ターミナルに接続
+    console.log('E2E DEBUG: Right-clicking host-1...');
+    await page.click('[data-id="host-1"]', { button: 'right', force: true });
+    console.log('E2E DEBUG: Right-clicked host-1, locating "ターミナルに接続"...');
+    const connectTerminalBtn = page.locator('text=ターミナルに接続').first();
+    await expect(connectTerminalBtn).toBeVisible();
+    console.log('E2E DEBUG: "ターミナルに接続" visible, clicking...');
+    await connectTerminalBtn.click();
+    console.log('E2E DEBUG: "ターミナルに接続" clicked');
+
+    // プロパティパネル用に左クリックし、ステータスタブを開く
     await page.click('[data-id="host-1"]', { force: true });
     await page.click('text=ステータス');
     
