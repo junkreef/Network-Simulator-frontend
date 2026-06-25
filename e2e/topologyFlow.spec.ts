@@ -42,6 +42,8 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     // Make sure we clean up / destroy containerlab topology after test run
     try {
       await request.post('http://localhost:8000/api/v1/topology/destroy');
+      // Give Docker and network interfaces 3 seconds to completely settle and clean up
+      await new Promise(resolve => setTimeout(resolve, 3000));
     } catch (e) {
       // Ignore cleanup error if already destroyed
     }
