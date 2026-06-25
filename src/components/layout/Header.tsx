@@ -126,6 +126,7 @@ export default function Header() {
             return {
               area_id: area.areaId || '0.0.0.0',
               networks: areaNetworks,
+              interfaces: area.interfaces || [],
               ranges: area.ranges || [],
               area_type: area.areaType || 'normal'
             };

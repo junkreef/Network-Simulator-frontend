@@ -280,6 +280,123 @@ test.describe('ネットワーク構築・VLAN疎通 E2E複合テスト', () => 
     await expect(page.locator('.property-panel pre')).toContainText(/2\.2\.2\.2/);
   });
 
+  test('OSPF ASBR・静的ルート再配送のE2Eテスト', async ({ page }) => {
+    const responsePromise = page.waitForResponse((resp: any) => 
+      resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
+    );
+    await page.goto('/');
+    await responsePromise;
+    await page.waitForTimeout(1000);
+    await expect(page.locator('.react-flow__node >> text=Router-A')).toBeVisible();
+
+    // 1. トポロジ・OSPF・Staticルート設定をZustand経由で流し込む
+    await page.evaluate(async () => {
+      const store = (window as any).useTopologyStore.getState();
+      
+      const cleanNodes = store.nodes
+        .filter((n: any) => n.id !== 'host-1')
+        .map((n: any) => {
+          if (n.id === 'router-1') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.1', netmask: '24', connectedTo: 'router-2' }
+                ],
+                routing: {
+                  ospf: {
+                    enabled: true,
+                    routerId: '1.1.1.1',
+                    areas: [
+                      {
+                        areaId: '0.0.0.0',
+                        interfaces: ['eth2'],
+                        ranges: [],
+                        areaType: 'normal'
+                      }
+                    ],
+                    redistribute: { connected: false, static: true, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
+                  },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
+                  bgp: { enabled: false, asNumber: 65001, routerId: '', neighbors: [], redistribute: { connected: false, static: false, ospf: false, rip: false } }
+                },
+                staticRoutes: [
+                  { destination: '192.168.100.0/24', nextHop: '10.0.12.99' }
+                ]
+              }
+            };
+          }
+          if (n.id === 'router-2') {
+            return {
+              ...n,
+              data: {
+                ...n.data,
+                interfaces: [
+                  { id: 'eth2', name: 'eth2', ipAddress: '10.0.12.2', netmask: '24', connectedTo: 'router-1' }
+                ],
+                routing: {
+                  ospf: {
+                    enabled: true,
+                    routerId: '2.2.2.2',
+                    areas: [
+                      {
+                        areaId: '0.0.0.0',
+                        interfaces: ['eth2'],
+                        ranges: [],
+                        areaType: 'normal'
+                      }
+                    ],
+                    redistribute: { connected: false, static: false, rip: false, bgp: false },
+                    defaultInformationOriginate: { enabled: false, always: false }
+                  },
+                  rip: { enabled: false, networks: [], redistribute: { connected: false, static: false, ospf: false, bgp: false } },
+                  bgp: { enabled: false, asNumber: 65002, routerId: '', neighbors: [], redistribute: { connected: false, static: false, ospf: false, rip: false } }
+                }
+              }
+            };
+          }
+          return n;
+        });
+
+      const cleanEdges = [
+        {
+          id: 'edge-r1-r2',
+          source: 'router-1',
+          target: 'router-2',
+          sourceHandle: 'eth2-right-src',
+          targetHandle: 'eth2-left-tgt',
+          type: 'networkEdge',
+          data: {
+            sourceInterface: 'eth2',
+            targetInterface: 'eth2'
+          }
+        }
+      ];
+      
+      await store.setTopology(cleanNodes, cleanEdges);
+    });
+
+    // 2. 適用
+    await page.click('[data-testid="apply-btn"]');
+    const successToast = page.locator('.toast-notification.success');
+    await expect(successToast).toBeVisible({ timeout: 90000 });
+
+    // 3. OSPFの隣接関係構築とルート伝播に十分な時間待機する
+    await page.waitForTimeout(65000);
+
+    // 4. ルーターB（router-2）を選択して、ルーティングテーブルを確認
+    await page.click('[data-id="router-2"]', { force: true });
+    await page.click('text=ステータス');
+    await page.selectOption('.property-panel select', 'routing_table');
+    await page.click('text=更新');
+
+    // ルーターBが、ルーターAから再配送された 192.168.100.0/24 へのルートを OSPF (O E2) 経由で学習していることを確認
+    await expect(page.locator('.property-panel pre')).toContainText(/192\.168\.100\.0\/24/);
+    await expect(page.locator('.property-panel pre')).toContainText(/via 10\.0\.12\.99/);
+  });
+
   test('BGP動的ルーティングのE2Eテスト', async ({ page }) => {
     const responsePromise = page.waitForResponse((resp: any) => 
       resp.url().includes('/api/v1/topology/state?deployed=false') && resp.status() === 200
