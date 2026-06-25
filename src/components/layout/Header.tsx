@@ -93,20 +93,24 @@ export default function Header() {
     try {
       // 2. Deploy Topology
       const deployResult = await applyTopology(deployPayload);
-      const isSuccess = (deployResult as any).status === 'success' || deployResult.success;
+      const deployStatus = (deployResult as any).status;
+      const isSuccess = deployStatus === 'success' || deployStatus === 'skipped' || deployResult.success;
       if (!isSuccess) {
         showToast('error', `トポロジの適用に失敗しました: ${deployResult.message}`);
         setIsApplying(false);
         return;
       }
 
-      // Wait a short moment for containerlab to initialize daemons inside containers before configuring them
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // If the deployment was skipped (no structural changes), we don't need to wait for container boot
+      if (deployStatus !== 'skipped') {
+        // Wait a short moment for containerlab to initialize daemons inside containers before configuring them
+        await new Promise(resolve => setTimeout(resolve, 10000));
+      }
 
-      // 3. Configure each node
+      // 3. Configure each node in parallel
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
-      for (const node of nodes) {
+      const configPromises = nodes.map(async (node) => {
         let configPayload: any = {};
 
         if (node.type === 'router') {
@@ -211,8 +215,17 @@ export default function Header() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(`${node.data.label || node.id} の設定適用に失敗しました: ${errorData.detail || 'Error'}`);
+          throw new Error(`${node.data.label || node.id}: ${errorData.detail || 'Error'}`);
         }
+      });
+
+      const results = await Promise.allSettled(configPromises);
+      const errors = results
+        .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+        .map(r => r.reason.message);
+
+      if (errors.length > 0) {
+        throw new Error(`いくつかのノードの設定適用に失敗しました:\n${errors.join('\n')}`);
       }
 
       // Update node statuses to 'up' in UI state
