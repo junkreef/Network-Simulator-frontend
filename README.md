@@ -1,4 +1,4 @@
-> 🇯🇵 日本語版はこちら → [../README.ja.md](../README.ja.md)
+> 🇯🇵 日本語版はこちら → [README.ja.md](./README.ja.md)
 
 # Network Simulator — Frontend
 
